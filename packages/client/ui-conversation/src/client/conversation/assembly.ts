@@ -195,6 +195,8 @@ export class UiConversation extends Service {
   readonly userText: UserTextRegistry
   private readonly bindings = new WeakMapWithValues<SessionBinding, BindingRecord>()
   private readonly images: HistoricalImageCache
+  private readonly contextMeterVisible = createSnapshotStore<boolean>(true)
+  private contextMeterClaims = 0
 
   /**
    * @param ctx - owning Client context.
@@ -230,6 +232,29 @@ export class UiConversation extends Service {
         for (const record of [...this.bindings.values]) this.drop(record, true)
       }
     }, 'ui-conversation assembly')
+  }
+
+  /** Live visibility of the composer's context-occupancy button; `false` while any claim from `claimContextMeter()` is held. */
+  get contextMeter(): ObservableSnapshot<boolean> {
+    return this.contextMeterVisible
+  }
+
+  /**
+   * Claim the context-occupancy presentation for another control, for the
+   * caller's lifetime. The composer omits its button below the input card
+   * until every claim is released.
+   * @returns idempotent release.
+   */
+  claimContextMeter(): () => void {
+    const dispose = this.ctx.effect(() => {
+      this.contextMeterClaims += 1
+      this.contextMeterVisible.set(false)
+      return () => {
+        this.contextMeterClaims -= 1
+        if (this.contextMeterClaims === 0) this.contextMeterVisible.set(true)
+      }
+    }, 'uiConversation.claimContextMeter')
+    return () => { void dispose() }
   }
 
   /**

@@ -302,6 +302,7 @@ function mount(
           useInput={useInput}
           inputActions={inputActions}
           keyboard={wiring}
+          useContextMeter={bindSnapshotSelector(createSnapshotStore(true))}
           addFiles={() => null}
           useFileUploads={bindSnapshotSelector(createSnapshotStore({}))}
           retryFileUpload={undefined}

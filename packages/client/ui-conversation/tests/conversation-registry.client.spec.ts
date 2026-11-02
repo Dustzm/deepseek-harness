@@ -429,6 +429,42 @@ describe('Conversation registries', () => {
     expect(views.entries()).toEqual([])
   })
 
+  it('hides the composer context meter while any caller holds a claim and restores it with the last release', async () => {
+    const { ctx, uiConversation } = await bootRegistries()
+    const visibility = uiConversation.contextMeter
+    const listener = vi.fn()
+    const unsubscribe = visibility.subscribe(listener)
+    expect(visibility.getSnapshot()).toBe(true)
+
+    let release: () => void = () => {}
+    const feature = ctx.inject(['uiConversation'], (featureCtx) => {
+      release = featureCtx.uiConversation.claimContextMeter()
+    })
+    await feature.await()
+    const other = uiConversation.claimContextMeter()
+    expect(visibility.getSnapshot()).toBe(false)
+
+    release()
+    release()
+    expect(visibility.getSnapshot()).toBe(false)
+    other()
+    expect(visibility.getSnapshot()).toBe(true)
+    expect(listener).toHaveBeenCalled()
+    unsubscribe()
+  })
+
+  it('releases a context meter claim with its caller fiber', async () => {
+    const { ctx, uiConversation } = await bootRegistries()
+    const feature = ctx.inject(['uiConversation'], (featureCtx) => {
+      featureCtx.uiConversation.claimContextMeter()
+    })
+    await feature.await()
+    expect(uiConversation.contextMeter.getSnapshot()).toBe(false)
+
+    await feature.dispose()
+    expect(uiConversation.contextMeter.getSnapshot()).toBe(true)
+  })
+
   it('coalesces one turn of registry changes into one rebuild per resident Conversation', async () => {
     const { uiConversation, binding, events, views } = await bootRegistries()
     uiConversation.binding(binding)

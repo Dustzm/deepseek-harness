@@ -174,6 +174,7 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
     useInput: bindSnapshotSelector(shell.state),
     inputActions: shell.actions,
     keyboard: shell,
+    useContextMeter: bindSnapshotSelector(createSnapshotStore<boolean>(true)),
     addFiles: () => null,
     useFileUploads: bindSnapshotSelector(createSnapshotStore({})),
     retryFileUpload: undefined,

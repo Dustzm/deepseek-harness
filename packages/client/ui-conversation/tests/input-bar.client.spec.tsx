@@ -101,6 +101,7 @@ interface BenchOptions {
   rightItems?: React.ReactNode
   activityEntry?: (owner: InputActivityOwnerProps) => React.ReactNode
   contextPressure?: ContextPressureProjection
+  contextMeter?: boolean
   footer?: React.ReactNode
   attachments?: readonly ComposerAttachment[]
   /** Upload states served for file-kind drafts (absent = every file is ready). */
@@ -201,6 +202,7 @@ function bench(over?: BenchOptions) {
     useInput: bindSnapshotSelector(shell.state),
     inputActions: shell.actions,
     keyboard: shell,
+    useContextMeter: bindSnapshotSelector(createSnapshotStore<boolean>(over?.contextMeter ?? true)),
     addFiles: over?.addFiles ?? (() => null),
     useFileUploads: bindSnapshotSelector(createSnapshotStore<DraftFileUploads>(over?.fileUploads ?? {})),
     retryFileUpload: undefined,
@@ -1911,5 +1913,11 @@ it('places context usage below the composer and hides it until the activity clos
   fireEvent.click(view.getByRole('button', { name: 'close activity' }))
   fireEvent.click(view.getByRole('button', { name: '上下文已用 25%' }))
   expect(view.getByRole('dialog', { name: '上下文已用' })).toBeTruthy()
+  expect(view.getByRole('button', { name: '发送消息' })).toBeTruthy()
+})
+
+it('omits the context usage button while another control claims the occupancy presentation', () => {
+  const { view } = bench({ draft: 'draft', contextMeter: false, contextPressure: { pressureTokens: 32_000, contextWindow: 128_000 } })
+  expect(view.queryByRole('button', { name: '上下文已用 25%' })).toBeNull()
   expect(view.getByRole('button', { name: '发送消息' })).toBeTruthy()
 })

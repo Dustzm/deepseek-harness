@@ -530,6 +530,8 @@ export interface ComposerBarInjected {
     notices: ObservableSnapshot<InputNotice | null>
     lexicon: ObservableSnapshot<ReadonlyMap<'/' | '@', readonly string[]>>
     menuLauncher: ObservableSnapshot<string | null>
+    /** Live visibility of the context-occupancy button below the input card (`uiConversation.claimContextMeter`). */
+    contextMeter: ObservableSnapshot<boolean>
   }
 }
 

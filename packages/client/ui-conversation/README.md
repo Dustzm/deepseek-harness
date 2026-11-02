@@ -68,7 +68,7 @@ The composer measures its expanded control groups after size, content, visibilit
 
 The context meter follows the [statistics-control radius](../../../docs/ui-radius.md#radius-scale).
 
-The context-occupancy button shows a ring and percentage below the input card, after the Session statistics. Clicking it opens the token breakdown in a panel kept inside the viewport, including when no statistics are shown; the button stays hidden until context usage and capacity are available.
+The context-occupancy button shows a ring and percentage below the input card, after the Session statistics. Clicking it opens the token breakdown in a panel kept inside the viewport, including when no statistics are shown; the button stays hidden until context usage and capacity are available. A plugin that presents occupancy in another control calls `ctx.uiConversation.claimContextMeter()`; the button stays hidden while any claim is held, and each claim is released with its caller's fiber or through the returned disposer.
 
 With Coding Tools off, the shell hides only Trajectory; other plugin-contributed Views remain available. The View tab bar is hidden when fewer than two Views are available. Turning Coding Tools off while Trajectory is active returns to Chat; stored View preferences and recorded Session data remain intact. Turning it on makes Trajectory available again. View owners receive the available roster so their navigation actions can follow the same visibility.
 
