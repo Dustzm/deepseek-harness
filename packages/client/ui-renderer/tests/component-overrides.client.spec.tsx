@@ -60,8 +60,10 @@ async function mount() {
   ))
   const container = document.createElement('div')
   document.body.append(container)
+  const renderer = ctx.get('uiRenderer')
+  if (renderer === undefined) throw new Error('ui-renderer did not provide its mount face')
   let unmount = () => {}
-  await act(async () => { unmount = ctx.get('uiRenderer').mount(container) })
+  await act(async () => { unmount = renderer.mount(container) })
   return { ctx, slots, view: { container }, unmount: () => act(() => { unmount() }) }
 }
 
