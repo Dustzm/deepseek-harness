@@ -8,7 +8,7 @@ import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { localizeAutoReviewDenial, normalizeAutoReviewReason } from '../src/client/tool/models/auto-review-denial.ts'
 import {
-  classifyTool, formatToolBody, resultText, toolRowModel,
+  classifyTool, formatToolBody, resultText, toolRowHeadline, toolRowModel,
 } from '../src/client/tool/models/tool-call-model.ts'
 import { ToolRow } from '../src/client/tool/components/ToolRow.tsx'
 import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/toolviews/GenericToolCard.tsx'
@@ -94,6 +94,13 @@ describe('tool-call-model', () => {
     const m = toolRowModel('pwsh', running())
     expect(m.variant).toBe('bash')
     expect(t(m.titleKey)).toBe('运行命令')
+  })
+
+  it('gives the row headline the full model title, state, and summary at every stage', () => {
+    for (const block of [running(), result(), result({ isError: true })]) {
+      const { variant, titleKey, summary, state } = toolRowModel('bash', block, '/work', '/home/u')
+      expect(toolRowHeadline('bash', block, '/work', '/home/u')).toEqual({ variant, titleKey, summary, state })
+    }
   })
 
   it('derives state across running/ok/error/interrupted', () => {

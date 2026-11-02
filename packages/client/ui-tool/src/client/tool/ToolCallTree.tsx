@@ -2,7 +2,7 @@
 import { memo, useMemo, type ReactNode } from 'react'
 import type { ToolCallBlock } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { ToolCallOwnerProps, ToolCallPhaseProps, ToolCallRowActionOwnerProps, ToolTreeProps } from '../contract/slots.ts'
-import { toolRowModel } from './models/tool-call-model.ts'
+import { toolRowHeadline, toolRowModel } from './models/tool-call-model.ts'
 import { GenericToolCard } from './toolviews/GenericToolCard.tsx'
 import css from './ToolCallTree.module.css'
 
@@ -37,8 +37,12 @@ const ToolCall = memo(function ToolCall({
     useDisclosure,
     inspect: inspectCall === undefined ? undefined : () => { inspectCall(callId) },
   }), [callId, toolName, call, openFile, cwd, home, loadImage, inspectCall, useDisclosure])
-  const row = useMemo(() => toolRowModel(toolName, call.block, cwd, home), [toolName, call, cwd, home])
-  const autoReviewDenied = call.phase === 'result' && row.autoReviewDenial !== null
+  const autoReviewDenied = useMemo(
+    () => call.phase === 'result' && toolRowModel(toolName, call.block).autoReviewDenial !== null,
+    [toolName, call],
+  )
+  // Row actions only label the row: the headline never reads the result text.
+  const row = useMemo(() => toolRowHeadline(toolName, call.block, cwd, home), [toolName, call, cwd, home])
   const actionOwner: ToolCallRowActionOwnerProps = useMemo(() => ({
     callId, toolName, state: row.state, title: t(row.titleKey), summary: row.summary,
   }), [callId, toolName, row, t])

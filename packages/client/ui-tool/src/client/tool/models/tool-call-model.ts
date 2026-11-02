@@ -291,6 +291,46 @@ export function formatToolBody(variant: ToolRowVariant, argsRaw: string): string
   return JSON.stringify(parsed, null, 2)
 }
 
+/** Title, state, and argument summary of one call row: the part of {@link ToolRowModel} that never reads the result text. */
+export type ToolRowHeadline = Pick<ToolRowModel, 'variant' | 'titleKey' | 'summary' | 'state'>
+
+/** Headline plus the argument facts the full model reuses. */
+interface HeadlineParts extends ToolRowHeadline {
+  readonly argsRaw: string | null
+  readonly argumentFilePath: string | undefined
+}
+
+function headlineParts(toolName: string, block: ToolCallBlock, cwd: string | undefined, home: string | undefined): HeadlineParts {
+  const variant = classifyTool(toolName)
+  const titleKey = toolTitleKey(toolName)
+  const done = 'kind' in block
+  const argsRaw = done ? block.call?.argsRaw ?? '' : block.phase === 'start' ? block.argsRaw : null
+  const primary = argumentSummary(variant, block.args, cwd, home)
+  const state: ToolRowState = !done ? block.phase === 'preparing' ? 'preparing' : 'running'
+    : block.error?.code === 'interrupted' ? 'stopped'
+      : block.isError ? 'error' : 'ok'
+  // The argument view serves every stage; the raw text is the fallback when it carries nothing useful.
+  const base = primary.summary !== '' || argsRaw === null ? primary.summary
+    : argsRaw === '' ? block.callId
+      : abbreviateHomePath(relativizeToCwd(deriveSummary(variant, argsRaw), cwd), home)
+  const summary = [titleKey === 'tool.title.generic' ? toolName : '', base].filter(Boolean).join(' · ')
+  return { variant, titleKey, summary, state, argsRaw, argumentFilePath: primary.filePath }
+}
+
+/**
+ * Derive a call row's title, state, and argument summary without reading its
+ * result text; consumers that only label the row use this instead of the full model.
+ * @param toolName - wire tool name (dispatch-supplied; survives windowless results).
+ * @param block - preparing call, dispatched call, or result from the snapshot.
+ * @param cwd - session workspace root; workspace-rooted path summaries display relative to it.
+ * @param home - host account home; a leftover POSIX home path displays as `~`.
+ * @returns the row headline.
+ */
+export function toolRowHeadline(toolName: string, block: ToolCallBlock, cwd?: string, home?: string): ToolRowHeadline {
+  const { variant, titleKey, summary, state } = headlineParts(toolName, block, cwd, home)
+  return { variant, titleKey, summary, state }
+}
+
 /**
  * Derive the full row model from a frozen call slice.
  * @param toolName - wire tool name (dispatch-supplied; survives windowless results).
@@ -300,25 +340,15 @@ export function formatToolBody(variant: ToolRowVariant, argsRaw: string): string
  * @returns the row model.
  */
 export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: string, home?: string): ToolRowModel {
-  const variant = classifyTool(toolName)
-  const titleKey = toolTitleKey(toolName)
+  const { variant, titleKey, summary, state, argsRaw, argumentFilePath } = headlineParts(toolName, block, cwd, home)
+  // Re-derived here so the result-only fields below narrow `block`.
   const done = 'kind' in block
-  const argsRaw = done ? block.call?.argsRaw ?? '' : block.phase === 'start' ? block.argsRaw : null
-  const primary = argumentSummary(variant, block.args, cwd, home)
-  const argumentPath = primary.filePath ?? (argsRaw === null ? undefined : deriveFilePath(variant, argsRaw))
+  const argumentPath = argumentFilePath ?? (argsRaw === null ? undefined : deriveFilePath(variant, argsRaw))
   const recordedPath = done ? recordedAbsolutePath(block.meta, 'path') : undefined
   const canUseArgumentPath = argumentPath !== undefined
     && (isAbsoluteWorkspacePath(argumentPath) || done && !block.isError && block.parentCallId === undefined)
   const filePath = argumentPath === undefined ? undefined
     : recordedPath ?? (canUseArgumentPath ? argumentPath : undefined)
-  const state: ToolRowState = !done ? block.phase === 'preparing' ? 'preparing' : 'running'
-    : block.error?.code === 'interrupted' ? 'stopped'
-      : block.isError ? 'error' : 'ok'
-  // The argument view serves every stage; the raw text is the fallback when it carries nothing useful.
-  const base = primary.summary !== '' || argsRaw === null ? primary.summary
-    : argsRaw === '' ? block.callId
-      : abbreviateHomePath(relativizeToCwd(deriveSummary(variant, argsRaw), cwd), home)
-  const summary = [titleKey === 'tool.title.generic' ? toolName : '', base].filter(Boolean).join(' · ')
   // The empty string is "no text" for both derived result fields: a settled
   // call with blank content has nothing to expand, and a blank first line
   // would erase the collapsed error row's summary slot.

@@ -475,6 +475,7 @@ export const InputBar = memo(function InputBar({
                 ? null
                 : renderSlot('conversation.input.right', {})}
               {sessionId === undefined ? null : renderSlot('conversation.input.model', { locked: modelSeatLocked })}
+              {sessionId === undefined ? null : renderSlot('conversation.input.status', {})}
             </div>
             {input === undefined || sessionId === undefined ? null : <div className={activity ? css.activityExpanded : css.activity}>
               {renderSlot('conversation.input.activity', { locked, onActiveChange: setActivity })}

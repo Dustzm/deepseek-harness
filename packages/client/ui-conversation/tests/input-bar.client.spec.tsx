@@ -100,6 +100,7 @@ interface BenchOptions {
   leftItems?: React.ReactNode
   rightItems?: React.ReactNode
   activityEntry?: (owner: InputActivityOwnerProps) => React.ReactNode
+  statusItems?: React.ReactNode
   contextPressure?: ContextPressureProjection
   contextMeter?: boolean
   footer?: React.ReactNode
@@ -173,6 +174,7 @@ function bench(over?: BenchOptions) {
     if (key === 'conversation.input.plan') return over?.planEntry ?? null
     if (key === 'conversation.input.permission') return over?.permissionEntry ?? null
     if (key === 'conversation.input.model') return over?.modelEntry ?? null
+    if (key === 'conversation.input.status') return over?.statusItems ?? null
     if (key === 'conversation.input.activity') return over?.activityEntry?.(owner as InputActivityOwnerProps) ?? null
     return null
   }) as never
@@ -1813,7 +1815,7 @@ describe('command launcher chrome and control seats', () => {
     expect([...new Set(slotCalls.map(c => c.key))]).toEqual([
       'conversation.input.overlay', 'conversation.input.attachments',
       'conversation.input.permission', 'conversation.input.plan', 'conversation.input.left',
-      'conversation.input.right', 'conversation.input.model', 'conversation.input.activity',
+      'conversation.input.right', 'conversation.input.model', 'conversation.input.status', 'conversation.input.activity',
       'conversation.composer.dock',
     ])
     expect(view.queryByLabelText('Plan mode')).toBeNull()
@@ -1875,6 +1877,17 @@ describe('command launcher chrome and control seats', () => {
     const live = bench({ running: true })
     expect((live.view.getByLabelText('添加文件或调用指令') as HTMLButtonElement).disabled).toBe(false)
   })
+})
+
+it('places status readouts after the model selector and hides them while an activity expands', () => {
+  const { view } = bench({ draft: 'draft', modelEntry: <button>model choice</button>, statusItems: <button>status readout</button>,
+    activityEntry: owner => <button onClick={() => { owner.onActiveChange(true) }}>expand activity</button>,
+  })
+  const model = view.getByRole('button', { name: 'model choice' })
+  const status = view.getByRole('button', { name: 'status readout' })
+  expect(model.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  fireEvent.click(view.getByRole('button', { name: 'expand activity' }))
+  expect(view.queryByRole('button', { name: 'status readout' })).toBeNull()
 })
 
 it('lets a toolbar activity replace accessories without replacing the draft editor or send action', () => {
