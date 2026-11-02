@@ -585,6 +585,22 @@ describe('UiWorkspaceService', () => {
     expect(b.sessions.retain).toHaveBeenCalledExactlyOnceWith(sid('chosen'), { source: 'mainView' })
   })
 
+  it('applies the latest default grouping until the user picks one, and restores the built-in default on disposal', () => {
+    const b = bench()
+    const disposeFlat = b.uiWorkspace.setDefaultGroupBy('flat')
+    expect(b.view.getSnapshot().groupBy).toBe('flat')
+    const disposeTree = b.uiWorkspace.setDefaultGroupBy('workspace-tree')
+    // A replaced default's disposer no longer owns the view.
+    disposeFlat()
+    expect(b.view.getSnapshot().groupBy).toBe('workspace-tree')
+    disposeTree()
+    disposeTree()
+    expect(b.view.getSnapshot().groupBy).toBe('workspace')
+    b.view.actions.setGroupBy('workspace-tree')
+    b.uiWorkspace.setDefaultGroupBy('flat')
+    expect(b.view.getSnapshot().groupBy).toBe('workspace-tree')
+  })
+
   it('pins on the Host, then leads the Session in its group and flat saved orders; unpin leaves them', async () => {
     const b = bench({
       workspaces: workspaceState([workspace(wid('a'), [sid('one'), sid('two'), sid('three')])]),

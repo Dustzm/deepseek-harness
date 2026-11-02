@@ -2655,3 +2655,16 @@ describe('Workspace tree grouping', () => {
     expect(b.props.insertWorkspaceBefore).toHaveBeenCalledWith(wid('alpha'), wid('gamma'))
   })
 })
+
+describe('createWorkspaceViewStore persistence', () => {
+  it('counts a non-default mode in a snapshot saved before the picked flag as the user\'s pick', () => {
+    for (const [saved, expected] of [['workspace-tree', 'workspace-tree'], ['workspace', 'flat']] as const) {
+      localStorage.setItem('dsh.workspace.view.v5', JSON.stringify({
+        groupBy: saved, orderBy: 'updated', groupExpansion: {}, sessionOrderByAccount: {},
+      }))
+      const restored = createWorkspaceViewStore().create()
+      restored.actions.followDefaultGroupBy('flat')
+      expect(restored.getSnapshot().groupBy).toBe(expected)
+    }
+  })
+})

@@ -21,6 +21,12 @@ export type SessionOrderBy = 'manual' | 'updated'
 /** Workspace browser viewing state persisted across surface remounts and reloads. */
 type WorkspaceViewState = {
   groupBy: SessionGroupBy
+  /**
+   * Whether `groupBy` is the user's own pick. False while it follows the built-in or a
+   * deployment default; omitted in snapshots written before this field, where a mode other
+   * than the built-in default counts as picked.
+   */
+  groupByChosen?: boolean
   orderBy: SessionOrderBy
   /** Explicit group expansion keyed by Workspace identity, including descendants in tree mode. */
   groupExpansion: Record<string, boolean>
@@ -42,6 +48,7 @@ type SessionOrderSource = {
  */
 type WorkspaceViewActions = {
   setGroupBy: (draft: WorkspaceViewState, mode: SessionGroupBy) => void
+  followDefaultGroupBy: (draft: WorkspaceViewState, mode: SessionGroupBy) => void
   setOrderBy: (
     draft: WorkspaceViewState,
     mode: SessionOrderBy,
@@ -75,6 +82,9 @@ function copySessionOrders(
   return Object.fromEntries(Object.entries(orders).map(([key, order]) => [key, [...order]]))
 }
 
+/** Grouping the browser starts with when neither the user nor a deployment chose one. */
+export const BUILT_IN_GROUP_BY: SessionGroupBy = 'workspace'
+
 /**
  * Create the workspace browser viewing store handle.
  * @returns the store handle (spec + type + identity + factory in one).
@@ -82,7 +92,8 @@ function copySessionOrders(
 export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState, WorkspaceViewActions> {
   return defineStore({
     init: (): WorkspaceViewState => ({
-      groupBy: 'workspace',
+      groupBy: BUILT_IN_GROUP_BY,
+      groupByChosen: false,
       orderBy: 'updated',
       groupExpansion: {},
       sessionOrderByAccount: {},
@@ -90,7 +101,15 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
     }),
     persist: 'dsh.workspace.view.v5',
     actions: {
-      setGroupBy: (d, mode: SessionGroupBy) => { d.groupBy = mode },
+      setGroupBy: (d, mode: SessionGroupBy) => {
+        d.groupBy = mode
+        d.groupByChosen = true
+      },
+      followDefaultGroupBy: (d, mode: SessionGroupBy) => {
+        if (d.groupByChosen ?? d.groupBy !== BUILT_IN_GROUP_BY) return
+        d.groupBy = mode
+        d.groupByChosen = false
+      },
       setOrderBy: (d, mode: SessionOrderBy, initialOrders) => {
         if (mode === d.orderBy) return
         d.sessionOrderByAccount = mode === 'manual' ? copySessionOrders(initialOrders) : {}

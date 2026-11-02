@@ -771,6 +771,15 @@ describe('createWorkspaceViewStore', () => {
     })
   })
 
+  it('follows a default grouping until the user picks one', () => {
+    const store = createWorkspaceViewStore().create()
+    store.actions.followDefaultGroupBy('flat')
+    expect(store.getSnapshot()).toMatchObject({ groupBy: 'flat', groupByChosen: false })
+    store.actions.setGroupBy('workspace')
+    store.actions.followDefaultGroupBy('workspace-tree')
+    expect(store.getSnapshot()).toMatchObject({ groupBy: 'workspace', groupByChosen: true })
+  })
+
   it('retains positions when reselecting Manual and snapshots the supplied order on mode switches', () => {
     const store = createWorkspaceViewStore().create()
     store.actions.setSessionOrder('alpha', ['two', 'one'], {})

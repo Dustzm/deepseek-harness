@@ -22,7 +22,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { DraftInitializationOptions } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { RowToast } from './contract/slots.ts'
 import { pinOrderAccounts, pinOrderSource } from './pin-order.ts'
-import type { WorkspaceViewStoreActions } from './stores.ts'
+import { BUILT_IN_GROUP_BY, type SessionGroupBy, type WorkspaceViewStoreActions } from './stores.ts'
 
 interface MainSelection {
   readonly sessionId?: SessionId
@@ -130,6 +130,14 @@ export interface UiWorkspace {
    * @returns created absolute path.
    */
   createDirectory(path: string, name: string): Promise<string>
+  /**
+   * Set the Session-list grouping the browser follows until the user picks one in
+   * **View options**; the user's pick persists and always wins. The latest call wins.
+   * @param mode - grouping to follow.
+   * @returns idempotent disposer returning an unpicked view to the built-in grouping,
+   * unless a later call has replaced this default.
+   */
+  setDefaultGroupBy(mode: SessionGroupBy): () => void
 }
 
 declare module '@deepseek-ai/cordis' {
@@ -161,6 +169,7 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     {}, { persist: { name: 'dsh.sessions.current' } },
   )
   private mainReference: SessionReference | undefined
+  private defaultGroupBy: object | undefined
 
   /**
    * @param ctx - Client root Context.
@@ -175,7 +184,7 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     private readonly directoryPicker: ClientRemote['directoryPicker'],
     private readonly workspaces: IWorkspaces,
     private readonly sessions: ISessions,
-    private readonly view: Pick<WorkspaceViewStoreActions, 'pinSessionOrder'>,
+    private readonly view: Pick<WorkspaceViewStoreActions, 'pinSessionOrder' | 'followDefaultGroupBy'>,
     private readonly notify: (toast: RowToast) => void,
   ) {
     super(ctx, 'uiWorkspace')
@@ -189,6 +198,17 @@ class UiWorkspaceService extends Service implements UiWorkspace {
         reference?.release()
       }
     }, 'ui-workspace: Workspace navigation policy')
+  }
+
+  setDefaultGroupBy(mode: SessionGroupBy): () => void {
+    const owner = {}
+    this.defaultGroupBy = owner
+    this.view.followDefaultGroupBy(mode)
+    return () => {
+      if (this.defaultGroupBy !== owner) return
+      this.defaultGroupBy = undefined
+      this.view.followDefaultGroupBy(BUILT_IN_GROUP_BY)
+    }
   }
 
   connectWorkspace(workspaceId: WorkspaceId, options: Pick<StartSessionOptions, 'agentPreset'> = {}): Promise<SessionId> {
