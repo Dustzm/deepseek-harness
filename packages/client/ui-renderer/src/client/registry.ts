@@ -201,7 +201,8 @@ export class SlotRegistry extends Service {
    * the same caller-context reason as `register`.
    * @param source - layer owner, e.g. the overriding package name.
    * @param target - entry to override: name alone for a single slot, `key` for keyed, `id` for list,
-   * or `registrant` for any kind (the only selector chain entries have).
+   * or `registrant` for any kind (the only selector chain entries have): the registering plugin's
+   * Loader entry name, e.g. its package or module name.
    * @param component - component rendered in place of the registered one.
    * @returns idempotent disposer that restores the previous layer or the registered component.
    * @throws when the slot is undeclared or the selector does not fit its kind.
@@ -508,7 +509,7 @@ export class SlotRegistry extends Service {
     // handle so the stored entry always carries a resolvable handle (the
     // core's shared-handle scope pinning applies to it harmlessly).
     const store = typeof options.store === 'function' ? options.store() : options.store
-    const registrant = options.registrant ?? (this.ctx.fiber as { name?: string } | undefined)?.name
+    const registrant = options.registrant ?? registrantOf(this.ctx.fiber)
     const erased: ErasedRegisterOptions = {
       ...options,
       ...(store !== undefined ? { store } : {}),
@@ -743,6 +744,33 @@ export class SlotRegistry extends Service {
     if (record.refs !== 0) return
     this._stores.delete(handle)
   }
+}
+
+/** The parts of a Cordis fiber the registrant stamp reads; `entry` is attached by the Loader. */
+interface StampedFiber {
+  readonly name?: string
+  readonly entry?: { readonly options: { readonly name?: string } }
+  readonly parent?: { readonly fiber?: StampedFiber }
+}
+
+/**
+ * Name a registration's owner: the nearest Loader entry on the fiber chain
+ * (its configured package or module name, stable across builds), else the
+ * fiber's own name. Minified bundles rename plugin functions, so the fiber
+ * name alone cannot address an entry.
+ * @param fiber - the registering context's fiber.
+ * @returns the registrant label, or undefined when neither is known.
+ */
+function registrantOf(fiber: StampedFiber | undefined): string | undefined {
+  let current = fiber
+  while (current !== undefined) {
+    const name = current.entry?.options.name
+    if (name !== undefined) return name
+    const parent = current.parent?.fiber
+    if (parent === undefined || parent === current) break
+    current = parent
+  }
+  return fiber?.name
 }
 
 function copyUnique<T>(

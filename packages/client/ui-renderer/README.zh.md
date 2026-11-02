@@ -37,7 +37,7 @@ kind: "package-reference"
 
 ### 覆盖条目的组件
 
-`ctx.slots.overrideComponent(source, target, component)` 让一条已注册的 entry 改用另一个组件渲染，entry 本身仍保持注册。覆盖组件收到的 props 与原组件完全相同：注入数据、store、标准 props、`t`，以及该 entry 声明的子 slot 的 `renderSlot`。`target` 写 slot 名，再按 slot 种类指定 entry：single slot 不写其他字段，keyed slot 写 `key`，list slot 写 `id`；任何种类都可写 `registrant`（注册方插件名），这是 chain entry 唯一可用的定位方式。slot 必须已声明，因此在 `ctx.slots.inject(name, …)` 里调用；slot 未声明或定位字段与种类不符时抛错。覆盖层按 `source` 与 target 区分：同一组合再次调用会替换该层，最新的匹配层胜出；返回的 disposer 与调用方插件卸载一样，会恢复上一层或原注册组件。组件 props 不与 entry 做类型核对，因为其中包含注册方的注入面；请用注册方导出的 props 类型声明覆盖组件。该调用不声明新的子 slot。
+`ctx.slots.overrideComponent(source, target, component)` 让一条已注册的 entry 改用另一个组件渲染，entry 本身仍保持注册。覆盖组件收到的 props 与原组件完全相同：注入数据、store、标准 props、`t`，以及该 entry 声明的子 slot 的 `renderSlot`。`target` 写 slot 名，再按 slot 种类指定 entry：single slot 不写其他字段，keyed slot 写 `key`，list slot 写 `id`；任何种类都可写 `registrant`，这是 chain entry 唯一可用的定位方式：注册方插件最近的 Loader 条目名（即其包名或模块名，跨构建不变），没有 Loader 条目时为插件自身的名字。slot 必须已声明，因此在 `ctx.slots.inject(name, …)` 里调用；slot 未声明或定位字段与种类不符时抛错。覆盖层按 `source` 与 target 区分：同一组合再次调用会替换该层，最新的匹配层胜出；返回的 disposer 与调用方插件卸载一样，会恢复上一层或原注册组件。组件 props 不与 entry 做类型核对，因为其中包含注册方的注入面；请用注册方导出的 props 类型声明覆盖组件。该调用不声明新的子 slot。
 
 -----
 

@@ -126,6 +126,33 @@ describe('slots.overrideComponent', () => {
     expect(view.container.textContent).toBe('oneTWO/VIEW/cA')
   })
 
+  it('stamps the registrant with the nearest Loader entry name, so minified plugins stay addressable', async () => {
+    const { ctx, slots, view } = await mount()
+    // A Loader-created fiber carries its entry; a nested plugin inherits the stamp.
+    const fiber = ctx.plugin({
+      name: 'Gb',
+      inject: ['slots'],
+      apply(child: Context) {
+        // The Loader attaches its entry to the fiber it creates; the nested plugin's fiber has none.
+        ;(child.fiber as unknown as { entry: { options: { name: string } } }).entry = { options: { name: '@scope/plugin-entry' } }
+        child.plugin({
+          name: 'nested',
+          inject: ['slots'],
+          apply(inner: Context) {
+            ;(inner.slots as unknown as ErasedSlots).register({ name: 'ov.chain', select: () => true }, () => <i>entry</i>)
+          },
+        })
+      },
+    })
+    await act(async () => {
+      await fiber
+      slots.overrideComponent('t', { name: 'ov.frame' }, (props: FrameProps) => <>{props.renderSlotChain('ov.chain', { label: 'c' })}</>)
+    })
+    expect(view.container.textContent).toBe('entry')
+    await act(async () => { slots.overrideComponent('t', { name: 'ov.chain', registrant: '@scope/plugin-entry' }, () => <i>ENTRY</i>) })
+    expect(view.container.textContent).toBe('ENTRY')
+  })
+
   it('rejects an undeclared slot and selectors that do not fit the slot kind', async () => {
     const { slots } = await mount()
     const C = () => null
