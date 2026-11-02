@@ -23,6 +23,9 @@
 /deepseek-ai-dsh-client-locale/use-this-package/registering-a-dictionary:
   en: 9b2fcfa8cae8dc4b
   zh: 293012a4d364ef59
+/deepseek-ai-dsh-client-locale/use-this-package/overriding-texts:
+  en: 06e20be24d0a237f
+  zh: 2b1ff1f1f991e2ab
 /deepseek-ai-dsh-client-locale/use-this-package/resolving-package-text:
   en: 3b63e84fe0fdf8f4
   zh: e97b5d1b92dff7ec
@@ -42,11 +45,11 @@
   en: d602d957654641c6
   zh: 2db822b746a6471d
 /deepseek-ai-dsh-client-locale/understand-the-implementation/dictionary-lookup:
-  en: f8dcc4035830e738
-  zh: 8452ac63ee148c61
+  en: e40eb0d31f07d852
+  zh: 80fd00ad4cf4c95e
 /deepseek-ai-dsh-client-locale/understand-the-implementation/source-map:
-  en: a382e032c06ced3f
-  zh: 419cb5f60b075388
+  en: 50af53c410aa646b
+  zh: f8ae5e1d1742fa9e
 /deepseek-ai-dsh-client-locale/further-exploration:
   en: f73d411c9e90dead
   zh: 8dd05f13e081af88

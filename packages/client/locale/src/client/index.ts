@@ -50,6 +50,16 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 /** Locale dictionary: flat key to template string ({name} placeholders). */
 export type LocaleDict = Record<string, string>
 
+/**
+ * One text override layer accepted by {@link LocaleRuntime.overrideTexts}:
+ * namespace → locale tag → the dictionary keys this layer replaces. Declared
+ * namespaces are key-checked against {@link LocaleNamespaceMap}; a layer names
+ * only the keys it replaces, and unnamed keys keep their dictionary text.
+ */
+export type LocaleTextOverrides = {
+  readonly [N in Extract<keyof LocaleNamespaceMap, string>]?: Readonly<Record<string, Partial<LocaleDictOf<N>>>>
+}
+
 /** Input accepted when a language-pack plugin adds a selectable language. */
 export interface LanguageRegistration {
   /** Stable BCP 47-style id stored as the locale preference. */
@@ -140,6 +150,38 @@ function normalizeLanguage(input: LanguageRegistration): Readonly<LanguageRegist
   return Object.freeze({ id: input.id, label: input.label, fallback: input.fallback })
 }
 
+/** Validated override layer: namespace → lowercase locale key → replaced texts. */
+type TextOverrideLayer = ReadonlyMap<string, ReadonlyMap<string, Readonly<LocaleDict>>>
+
+/**
+ * Validate locale tags and detach an override layer from its mutable input.
+ * @param source - layer identity, named in the error.
+ * @param texts - caller-supplied layer.
+ * @returns the frozen layer keyed by lowercase locale.
+ * @throws when a locale tag is not BCP 47-style.
+ */
+function normalizeTextOverrides(source: string, texts: LocaleTextOverrides): TextOverrideLayer {
+  // Widen to the untyped layout; every declared namespace's partial dictionary fits it.
+  const untyped: Readonly<Record<string, Readonly<Record<string, Readonly<Partial<LocaleDict>>>> | undefined>> = texts
+  const layer = new Map<string, ReadonlyMap<string, Readonly<LocaleDict>>>()
+  for (const [ns, locales] of Object.entries(untyped)) {
+    if (locales === undefined) continue
+    const byLocale = new Map<string, Readonly<LocaleDict>>()
+    for (const [locale, dict] of Object.entries(locales)) {
+      if (!LOCALE_ID_PATTERN.test(locale)) {
+        throw new Error(`text override "${source}": locale id "${locale}" in namespace "${ns}" is not a BCP 47-style tag`)
+      }
+      const entries: LocaleDict = {}
+      for (const [key, value] of Object.entries(dict)) {
+        if (value !== undefined) entries[key] = value
+      }
+      byLocale.set(localeKey(locale), Object.freeze(entries))
+    }
+    layer.set(ns, byLocale)
+  }
+  return layer
+}
+
 /**
  * Point `<html lang>` at the active locale, keeping the served document in
  * sync with locale snapshot changes.
@@ -155,7 +197,8 @@ function syncDocumentLanguage(snapshot: LocaleSnapshot): void {
 /**
  * Dictionary registry plus locale preference. Lookup walks the active
  * language's declared fallback chain in the entry namespace, then repeats it
- * in the shared common namespace before showing the key itself. Reads go
+ * in the shared common namespace before showing the key itself; at each step
+ * {@link overrideTexts} layers answer before the dictionary. Reads go
  * through {@link getLocale}; preferences change only through
  * {@link setLocale}, while language packs extend the catalog through
  * {@link addLanguage}. Continuous sync uses the `locale/change` event or
@@ -164,6 +207,11 @@ function syncDocumentLanguage(snapshot: LocaleSnapshot): void {
  */
 export class LocaleRuntime {
   private dicts = new Map<string, Map<string, LocaleDict>>()
+  /** Text override layers by source, composed in `seq` order into {@link overrideIndex}. */
+  private textOverrides = new Map<string, { seq: number; texts: TextOverrideLayer }>()
+  private textOverrideSeq = 0
+  /** Composed overrides: namespace → lowercase locale key → winning texts. */
+  private overrideIndex = new Map<string, Map<string, LocaleDict>>()
   private bound = new Map<string, Translate>()
   private catalog = new Map<string, LocaleDefinition>()
   private fallbackChains = new Map<string, readonly LocaleId[]>()
@@ -437,6 +485,51 @@ export class LocaleRuntime {
   }
 
   /**
+   * Stack a text override layer over the registered dictionaries — the text
+   * analogue of `theme.overrideTokens`. Dictionaries stay untouched; at each
+   * step of the lookup chain the composed overrides answer before the
+   * dictionary of the same namespace and locale, layers compose in seq order
+   * with later layers winning per key, and removing a layer restores whatever
+   * it covered. A key absent from every layer keeps its dictionary text, and an
+   * override may arrive before or after the dictionary it covers. Calling again
+   * with the same source replaces that source's whole layer and restacks it on
+   * top. Bumps the revision like a registration; `locale/change` stays reserved
+   * for active-locale switches.
+   * @param source - layer identity; one layer per source (pass the package id).
+   * @param texts - namespace → locale tag → replaced keys.
+   * @returns disposer removing exactly the layer this call created; a no-op once
+   * the source has re-overridden (the newer layer is not torn down).
+   * @throws when a locale tag is not a BCP 47-style tag.
+   */
+  overrideTexts(source: string, texts: LocaleTextOverrides): () => void {
+    const layer = { seq: this.textOverrideSeq++, texts: normalizeTextOverrides(source, texts) }
+    this.textOverrides.set(source, layer)
+    this.composeTextOverrides()
+    return () => {
+      if (this.textOverrides.get(source) !== layer) return
+      this.textOverrides.delete(source)
+      this.composeTextOverrides()
+    }
+  }
+
+  /** Fold override layers in seq order (later layers win per key) and publish. */
+  private composeTextOverrides(): void {
+    const index = new Map<string, Map<string, LocaleDict>>()
+    for (const layer of [...this.textOverrides.values()].sort((a, b) => a.seq - b.seq)) {
+      for (const [ns, locales] of layer.texts) {
+        let target = index.get(ns)
+        if (target === undefined) {
+          target = new Map()
+          index.set(ns, target)
+        }
+        for (const [locale, entries] of locales) target.set(locale, { ...target.get(locale), ...entries })
+      }
+    }
+    this.overrideIndex = index
+    this.publish(this.snapshot.active, false)
+  }
+
+  /**
    * Bind a declared namespace to a translate function typed to its
    * dictionary key union (plus the shared common vocabulary) — the same key
    * domain the framework-injected `t` seat carries. The returned reference
@@ -474,9 +567,11 @@ export class LocaleRuntime {
   }
 
   private lookup(ns: string, key: string, chain: readonly LocaleId[]): string | undefined {
+    const overrides = this.overrideIndex.get(ns)
     const locales = this.dicts.get(ns)
     for (const locale of chain) {
-      const value = locales?.get(localeKey(locale))?.[key]
+      const k = localeKey(locale)
+      const value = overrides?.get(k)?.[key] ?? locales?.get(k)?.[key]
       if (value !== undefined) return value
     }
     return undefined

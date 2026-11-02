@@ -37,6 +37,10 @@ Native shells may provide `__DSH_LOCALE__` with an asynchronous `read()` and an 
 
 Call `ctx.locale.register(ns, { zh, en })` with a namespace merged into `LocaleNamespaceMap`; the compiler checks every key against the namespace's typed key union and requires both shipped locales. Consumers translate through `ctx.locale.bind(ns)` or the framework-injected `t` seat. A dictionary registered after the UI is already mounted is picked up without a remount.
 
+### Overriding texts
+
+Call `ctx.locale.overrideTexts(source, { [ns]: { [locale]: { key: text } } })` to replace individual texts that another plugin's dictionary owns, for example product terminology in a downstream distribution. A layer names only the keys it replaces, so every other key keeps its dictionary text; declared namespaces are key-checked against `LocaleNamespaceMap`. Layers stack like `theme.overrideTokens`: one layer per source, later layers win per key, calling again with the same source replaces that layer and moves it to the top, and the returned disposer removes exactly the layer it created. A layer may register before or after the dictionary it covers, and it refreshes mounted outlets without emitting `locale/change`.
+
 ### Resolving package text
 
 Use `ctx.locale.resolveText(text)` for [`LocalizedText`](../../util/package-manifest/README.md), such as installed plugin titles and descriptions. Literal strings are returned unchanged. Translation maps use lowercase language ids, require an `en` fallback, and follow the active language's declared fallback chain. They do not consult or register namespace dictionaries.
@@ -91,13 +95,13 @@ The provisional locale comes from the browser (`navigator.languages` matched by 
 
 Document language synchronization writes `<html lang>` only when its value changes; dictionary-only revisions leave the attribute untouched.
 
-The typed object form requires complete dictionaries for both built-in locales. The per-locale form lets language packs register each namespace independently. For each key, lookup walks the active language's declared fallback chain in the requested namespace, repeats that chain in `common`, then displays the key itself. Bound translate functions retain stable identity per namespace so they can ride inject surfaces without breaking memoization.
+The typed object form requires complete dictionaries for both built-in locales. The per-locale form lets language packs register each namespace independently. For each key, lookup walks the active language's declared fallback chain in the requested namespace, repeats that chain in `common`, then displays the key itself. At each step the composed override layers answer before that namespace's dictionary for the same locale; layers are folded once per change, so lookup cost does not grow with the number of layers. Bound translate functions retain stable identity per namespace so they can ride inject surfaces without breaking memoization.
 
 ### Source map
 
 | File | Role |
 |---|---|
-| [`src/client/index.ts`](src/client/index.ts) | `LocaleRuntime`, dictionary registry, Language row registration, `locale/change` event |
+| [`src/client/index.ts`](src/client/index.ts) | `LocaleRuntime`, dictionary registry, text override layers, Language row registration, `locale/change` event |
 | [`src/index.ts`](src/index.ts) | Node half: registers the `locale` settings namespace |
 | [`src/locale-settings.ts`](src/locale-settings.ts) | The durable schema for `locale.preference` |
 | [`src/locales/`](src/locales/) | The shipped `zh`/`en` dictionaries |
