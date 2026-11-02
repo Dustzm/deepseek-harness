@@ -1,4 +1,4 @@
-/** Resolve the Host account's Documents directory for first-use Workspace creation. */
+/** Resolve the first-use Workspace directory: under the Host account's Documents directory, or under a configured root. */
 
 import { homedir } from 'node:os'
 import { posix, win32 } from 'node:path'
@@ -19,10 +19,35 @@ interface DocumentsDirectoryInternals {
  * @returns the normalized directory.
  */
 export function validateDocumentsDirectory(directory: string, platform: NodeJS.Platform = process.platform): string {
+  return fullyQualified('Documents directory', directory, platform)
+}
+
+/**
+ * Validate a configured first-use Workspace root without resolving it against cwd.
+ * @param root - fully qualified directory spelling.
+ * @param platform - Host platform.
+ * @returns the normalized directory.
+ */
+export function validateDefaultWorkspaceRoot(root: string, platform: NodeJS.Platform = process.platform): string {
+  return fullyQualified('Default Workspace root', root, platform)
+}
+
+/**
+ * Resolve the first-use directory under a configured root, without a Documents lookup.
+ * @param root - fully qualified directory that holds the first-use Workspace.
+ * @param platform - Host platform.
+ * @returns the absolute candidate path: `root` joined with the fixed first-use leaf name.
+ */
+export function defaultWorkspaceUnder(root: string, platform: NodeJS.Platform = process.platform): string {
+  const paths = platform === 'win32' ? win32 : posix
+  return paths.join(validateDefaultWorkspaceRoot(root, platform), DEFAULT_WORKSPACE_DIRECTORY)
+}
+
+function fullyQualified(label: string, directory: string, platform: NodeJS.Platform): string {
   const paths = platform === 'win32' ? win32 : posix
   const root = paths.parse(directory).root
   if (!paths.isAbsolute(directory) || (platform === 'win32' && (root === '\\' || root === '/'))) {
-    throw new Error(`Documents directory must be fully qualified: '${directory}'`)
+    throw new Error(`${label} must be fully qualified: '${directory}'`)
   }
   return paths.normalize(directory)
 }

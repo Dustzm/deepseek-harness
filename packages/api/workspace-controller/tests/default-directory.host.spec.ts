@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { NativeCommandRunner } from '@deepseek-ai/dsh-native-command'
-import { defaultWorkspaceDirectory, validateDocumentsDirectory } from '../src/default-directory.ts'
+import { defaultWorkspaceDirectory, defaultWorkspaceUnder, validateDocumentsDirectory } from '../src/default-directory.ts'
 
 describe('system Documents directory', () => {
   it.each([
@@ -44,5 +44,17 @@ describe('system Documents directory', () => {
   it('accepts redirected UNC Documents directories', () => {
     expect(validateDocumentsDirectory('\\\\server\\share\\Documents', 'win32')).toBe('\\\\server\\share\\Documents')
     expect(() => validateDocumentsDirectory('relative', 'linux')).toThrow('fully qualified')
+  })
+})
+
+describe('configured first-use root', () => {
+  it('joins the fixed leaf name under the root on each platform', () => {
+    expect(defaultWorkspaceUnder('/home/a/.app/', 'linux')).toBe('/home/a/.app/default-workspace')
+    expect(defaultWorkspaceUnder('C:\\Users\\a\\.app', 'win32')).toBe('C:\\Users\\a\\.app\\default-workspace')
+  })
+
+  it('rejects a root without a fully qualified spelling', () => {
+    expect(() => defaultWorkspaceUnder('relative', 'linux')).toThrow('Default Workspace root must be fully qualified')
+    expect(() => defaultWorkspaceUnder('\\rooted', 'win32')).toThrow('fully qualified')
   })
 })

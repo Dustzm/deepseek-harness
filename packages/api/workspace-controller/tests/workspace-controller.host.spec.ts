@@ -10,7 +10,7 @@ import { RemoteError, type PeerId, type Principal, type RemoteInvocation } from 
 import WorkspaceRegistry from '@deepseek-ai/dsh-workspace'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import RemoteAccessService, { type RemoteAccessCondition, type RemoteAccessRole } from '@deepseek-ai/dsh-api-remote-access'
-import WorkspaceController from '../src/index.ts'
+import WorkspaceController, { type Config } from '../src/index.ts'
 import { DEFAULT_WORKSPACE_DIRECTORY } from '../src/default-workspace.ts'
 import { WorkspaceFeed } from '../src/feed.ts'
 import type { WorkspaceFollowFrame } from '../src/types.ts'
@@ -51,7 +51,7 @@ function deferred<T>(): Deferred<T> {
   return { promise, resolve }
 }
 
-async function harness(options: { systemDocuments?: boolean } = {}) {
+async function harness(options: { systemDocuments?: boolean; workspaceRoot?: boolean; config?: Config } = {}) {
   const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'dsh-workspace-controller-')))
   tempDirs.push(root)
   const ctx = new Context()
@@ -71,7 +71,8 @@ async function harness(options: { systemDocuments?: boolean } = {}) {
     resources: { register: vi.fn(() => dispose) },
   } as never)
   new RemoteAccessService(ctx)
-  const controller = new WorkspaceController(ctx, options.systemDocuments === true ? {} : { documentsDirectory: root })
+  const controller = new WorkspaceController(ctx, options.config ?? (options.systemDocuments === true ? {}
+    : options.workspaceRoot === true ? { defaultWorkspaceRoot: root } : { documentsDirectory: root }))
   return { controller, ctx, root, storageDomain }
 }
 
@@ -599,6 +600,19 @@ describe('first-use Remote', () => {
     expect(existsSync(result!.workspace.path)).toBe(true)
     expect(ctx.sessions.list()).toEqual([])
     expect(await controller.initializeDefault(signal)).toEqual(result)
+  })
+
+  it('creates the Workspace under a configured root without the Documents segment', async () => {
+    const { controller, root } = await harness({ workspaceRoot: true })
+    const result = await controller.initializeDefault(new AbortController().signal)
+    expect(result!.workspace.path).toBe(join(root, DEFAULT_WORKSPACE_DIRECTORY))
+    expect(result!.workspace.title).toBe(DEFAULT_WORKSPACE_DIRECTORY)
+    expect(existsSync(result!.workspace.path)).toBe(true)
+  })
+
+  it('rejects a relative root and a root combined with a Documents override', async () => {
+    await expect(harness({ config: { defaultWorkspaceRoot: 'relative' } })).rejects.toThrow('fully qualified')
+    await expect(harness({ config: { defaultWorkspaceRoot: '/a', documentsDirectory: '/b' } })).rejects.toThrow('not both')
   })
 
   it('skips ineligible first use and propagates preparation failures', async () => {
