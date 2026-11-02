@@ -12,6 +12,7 @@
 | 首页 hero 新增扩展位 `conversation.hero.subtitle`、`conversation.hero.footer`；`hero.preview` 为空时不渲染预览角标 | 通用扩展接口 | `packages/client/ui-conversation`（`contract/slots.ts`、`apply.ts`、`EmptyHero.tsx`、`ConversationContent.tsx`、测试、中英 README） | hero 在 `conversation.content` Factory 内部，标题下与输入框下没有扩展位，下游加不了问候语、快捷入口与最近任务；预览角标无法去掉 | 上游提供等价扩展位后可去掉 |
 | 会话列表默认分组方式 `ctx.uiWorkspace.setDefaultGroupBy(mode)` | 通用扩展接口 | `packages/client/ui-workspace`（`stores.ts` 的 `groupByChosen` 与 `followDefaultGroupBy`、`navigation.ts`、测试、中英 README） | 分组方式是浏览器本地视图状态，默认固定为按工作区，下游无法改起始值；客户端插件也拿不到配置行 | 上游提供等价默认值接口后可去掉 |
 | 工具调用行尾操作扩展位 `tool.call.row.action` | 通用扩展接口 | `packages/client/ui-tool`（`contract/slots.ts`、`apply.ts`、`ToolCallTree.tsx` 与样式、测试、中英 README） | 通用工具行与各内置工具视图不是可扩展的行，下游无法给失败的调用加「重试」这类行内操作；新增 list 扩展位，空列表时布局不变 | 上游提供等价扩展位后可去掉 |
+| Web 构建的产品标识：`DSH_CLIENT_TITLE`、`DSH_CLIENT_SHORT_TITLE` 写进 Web manifest，`DSH_CLIENT_ICON`、`DSH_CLIENT_ICON_DARK` 替换 favicon | 桌面壳（产品身份） | `apps/web`（`product-identity.ts`、`vite.config.ts`、测试 `tests/product-identity.spec.ts`）、`docs/development.md` 中英 | DSH 只把构建期标题写进页面 `<title>`，manifest 名称与 favicon 写死为 DeepSeek Harness，下游换不了产品名与图标；新增的变量未设置时产物不变，品牌内容由调用方在构建时传入 | 上游提供等价的构建期产品标识后可去掉 |
 
 ## 核心仓库如何使用这些改动
 
