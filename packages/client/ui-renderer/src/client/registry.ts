@@ -18,11 +18,13 @@ import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import { SlotCore, StaleAuthorizationError, standardHookPropName } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
-  HostObservable, LiveCompositionNode, LocaleFace, OwnerOf, RegisterFactory, SlotEntryDef, SlotMap, SlotRenderer, SlotRendererHost,
+  HostObservable, LiveCompositionNode, LocaleFace, OwnerOf, RegisterFactory, SlotComponent, SlotEntryDef, SlotMap, SlotRenderer,
+  SlotRendererHost,
   RootStandardSourceContribution, ScopedStandardSourceBinding, SlotScope, SlotScopeAdapter, SlotSpec,
   StandardSourceBinding, StoredFactory,
   StoreDecl, StoreFactory, StoredEntry, StoreInstanceLike,
 } from '@deepseek-ai/dsh-client-ui-slots'
+import { ComponentOverrideTable, type SlotOverrideTarget, validateOverrideTarget } from './component-overrides.ts'
 import { SlotAssemblyError } from './errors.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -119,6 +121,8 @@ type SlotInjectionEffect = (() => void) | Iterable<() => void, void, void>
 /** cordis Service layer of the slot system; see the module doc for the split with SlotCore. */
 export class SlotRegistry extends Service {
   private readonly _core = new SlotCore()
+  /** Component override layers; the installed renderer reads them per rendered entry. */
+  readonly componentOverrides = new ComponentOverrideTable()
   /** Store-instance axis: handle -> mounted scope, refcount, resolved instances. */
   private readonly _stores = new Map<EngineStoreHandle, StoreAxisRecord>()
   private readonly _factoryStores = new Map<StoredFactory, FactoryStoreAxis>()
@@ -179,6 +183,32 @@ export class SlotRegistry extends Service {
    * own root ctx and silently break per-plugin disposal.
    */
   declare readonly register: SlotCore['register']
+
+  /**
+   * Render a different component for one registered entry while the entry
+   * stays registered: its injected data, store, standard props, `t` seat, and
+   * child-slot authority are unchanged, so the override receives exactly the
+   * props the registered component would. Layers are keyed by `source` and
+   * target; repeating the pair replaces that layer, and the newest matching
+   * layer wins. The layer lives in the caller's effect, like `register`.
+   *
+   * The slot must already be declared — call this from `slots.inject(name, …)`.
+   * The component type is not checked against the entry's props, because they
+   * include the registrant's injected face; type the override with the
+   * registrant's exported props.
+   *
+   * Declared here, implemented by prototype assignment below the class, for
+   * the same caller-context reason as `register`.
+   * @param source - layer owner, e.g. the overriding package name.
+   * @param target - entry to override: name alone for a single slot, `key` for keyed, `id` for list,
+   * or `registrant` for any kind (the only selector chain entries have).
+   * @param component - component rendered in place of the registered one.
+   * @returns idempotent disposer that restores the previous layer or the registered component.
+   * @throws when the slot is undeclared or the selector does not fit its kind.
+   */
+  declare readonly overrideComponent: <K extends keyof SlotMap & string>(
+    source: string, target: SlotOverrideTarget<K>, component: SlotComponent<never>,
+  ) => () => void
 
   /**
    * Register one reusable Component Factory under the caller's effect lifetime.
@@ -744,6 +774,13 @@ function copyUnique<T>(
     const options = rawOptions as ErasedRegisterOptions
     // oxlint-disable-next-line typescript/no-misused-promises -- synchronous cleanup; direct return preserves disposer identity
     return this.ctx.effect(() => this['_register'](options, component), 'slots.register()')
+  }
+
+;(SlotRegistry.prototype as { overrideComponent: (source: string, target: object, component: unknown) => () => void }).overrideComponent
+  = function overrideComponent(this: SlotRegistry, source: string, target: object, component: unknown): () => void {
+    const erased = target as { name: string; key?: string; id?: string; registrant?: string }
+    validateOverrideTarget(erased, this['_core'].specDynamic(erased.name))
+    return this.ctx.effect(() => this.componentOverrides.add(source, erased, component), 'slots.overrideComponent()')
   }
 
 ;(SlotRegistry.prototype as { registerFactory: (options: object, component: unknown) => () => void }).registerFactory

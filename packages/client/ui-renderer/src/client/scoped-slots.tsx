@@ -18,6 +18,7 @@ import {
   keyedObservableHook, maybeObservableHook, observableHook, useHost, useRootBinding,
   useScopeBinding,
 } from './bindings.tsx'
+import { ComponentOverrideTable } from './component-overrides.ts'
 import { SlotAssemblyError } from './errors.ts'
 
 type InjectedProps = Record<string, unknown>
@@ -653,6 +654,22 @@ function renderEntry(
   )
 }
 
+/** Override layers of the installing registry; a renderer built without one renders registered components. */
+const OverridesContext = createContext<ComponentOverrideTable>(new ComponentOverrideTable())
+
+/**
+ * The component one entry renders: the newest matching override layer, or the
+ * registered component. Re-renders when layers change.
+ * @param slotKey - slot the entry renders in.
+ * @param entry - stored registration.
+ * @returns the component to render with the entry's props.
+ */
+function useEntryComponent(slotKey: string, entry: StoredEntry): FC<InjectedProps> {
+  const overrides = useContext(OverridesContext)
+  useSyncExternalStore(overrides.subscribe, overrides.getRevision)
+  return overrides.componentOf(slotKey, entry) as FC<InjectedProps>
+}
+
 function SessionEntry({ entry, ownerProps, binding, slotKey, slotInjected, hookContext, hasHookContext }: {
   entry: StoredEntry
   ownerProps: object
@@ -664,7 +681,7 @@ function SessionEntry({ entry, ownerProps, binding, slotKey, slotInjected, hookC
 }) {
   const host = useHost()
   const rootBinding = useRootBinding()
-  const Comp = entry.component as FC<InjectedProps>
+  const Comp = useEntryComponent(slotKey, entry)
   const { kit, standard, actions } = standardKit(host, entry, 'session', rootBinding, binding)
   const injected = cachedSessionInject(entry, binding, actions)
   return renderEntry(slotKey, Comp, kit, standard, injected, slotInjected, ownerProps, hookContext, hasHookContext)
@@ -681,7 +698,7 @@ function SessionMaybeEntryBody({ entry, ownerProps, binding, slotKey, slotInject
 }) {
   const host = useHost()
   const rootBinding = useRootBinding()
-  const Comp = entry.component as FC<InjectedProps>
+  const Comp = useEntryComponent(slotKey, entry)
   const { kit, standard, actions } = standardKit(host, entry, 'session-maybe', rootBinding, binding)
   const injected = cachedSessionMaybeInject(entry, binding, actions)
   return renderEntry(slotKey, Comp, kit, standard, injected, slotInjected, ownerProps, hookContext, hasHookContext)
@@ -774,7 +791,7 @@ function RootEntry({ entry, ownerProps, slotKey, slotInjected, hookContext, hasH
 }) {
   const host = useHost()
   const rootBinding = useRootBinding()
-  const Comp = entry.component as FC<InjectedProps>
+  const Comp = useEntryComponent(slotKey, entry)
   const { kit, standard, actions } = standardKit(host, entry, 'root', rootBinding, undefined)
   const injected = cachedRootInject(entry, actions)
   return renderEntry(slotKey, Comp, kit, standard, injected, slotInjected, ownerProps, hookContext, hasHookContext)
@@ -1311,22 +1328,26 @@ function RootOutlet({ ownerProps }: { ownerProps: object }) {
 
 /**
  * Build the renderer installed into the `ui-renderer` SlotRegistry
- * (ctx.slots.install(createSlotRenderer()) at boot; the service owns the
- * install/renderSlot contract and the double-install/not-installed throws).
+ * (ctx.slots.install(createSlotRenderer(ctx.slots.componentOverrides)) at boot;
+ * the service owns the install/renderSlot contract and the
+ * double-install/not-installed throws).
+ * @param overrides - the registry's component override layers; omitted, entries render their registered components.
  * @returns the renderer.
  */
-export function createSlotRenderer(): SlotRenderer {
+export function createSlotRenderer(overrides?: ComponentOverrideTable): SlotRenderer {
+  const root = (host: SlotRendererHost, ownerProps: object): ReactNode => (
+    <HostContext.Provider value={host}>
+      <RootStandardProvider>
+        <ScopeProvider scope="session-maybe">
+          <RootOutlet ownerProps={ownerProps} />
+        </ScopeProvider>
+      </RootStandardProvider>
+    </HostContext.Provider>
+  )
   return {
     renderRoot(host, ownerProps) {
-      return (
-        <HostContext.Provider value={host}>
-          <RootStandardProvider>
-            <ScopeProvider scope="session-maybe">
-              <RootOutlet ownerProps={ownerProps} />
-            </ScopeProvider>
-          </RootStandardProvider>
-        </HostContext.Provider>
-      )
+      if (overrides === undefined) return root(host, ownerProps)
+      return <OverridesContext.Provider value={overrides}>{root(host, ownerProps)}</OverridesContext.Provider>
     },
   }
 }

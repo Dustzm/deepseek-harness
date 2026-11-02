@@ -35,6 +35,10 @@ This package is infrastructure: the web shell and the boot kernel are its only d
 
 A business plugin registers an ordinary Slot entry or a reusable Component Factory; the renderer binds the runtime's session and workspace observable sources into selector hooks at the render position. The plugin receives standard scope props through its derived Component props — it never imports the renderer or touches React internals. Every renderer-created Component can render a Factory occurrence, and a Factory can expose caller-selected local Components without sharing implementation values between packages.
 
+### Overriding an entry's component
+
+`ctx.slots.overrideComponent(source, target, component)` renders a different component for one registered entry while the entry stays registered. The override receives exactly the props the registered component would: injected data, store, standard props, the `t` seat, and `renderSlot` for the child slots that entry declares. `target` names the slot and, by slot kind, the entry: nothing more for a single slot, `key` for a keyed slot, `id` for a list slot, or `registrant` (the registering plugin's name) for any kind, which is the only selector chain entries have. The slot must already be declared, so call it from `ctx.slots.inject(name, …)`; an undeclared slot or a selector that does not fit the kind throws. Layers are keyed by `source` and target: repeating the pair replaces that layer, the newest matching layer wins, and the returned disposer, like the caller's plugin unload, restores the previous layer or the registered component. The component's props are not checked against the entry, because they include the registrant's injected face; type the override with the registrant's exported props. The call does not declare new child slots.
+
 -----
 
 <a id="understand-the-implementation"></a>

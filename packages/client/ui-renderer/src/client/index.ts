@@ -13,6 +13,7 @@ import { SlotRegistry } from './registry.ts'
 
 export { SlotRegistry } from './registry.ts'
 export type { RootOwnerProps } from './registry.ts'
+export type { SlotOverrideTarget } from './component-overrides.ts'
 
 export type {
   ChainRenderOpts, HostObservable, RenderOpts, SnapshotSelectorHook, SlotRenderer,
@@ -88,7 +89,7 @@ function mountApp(container: HTMLElement, app: () => ReactNode): Root {
  */
 export function apply(ctx: Context): void {
   const slots = new SlotRegistry(ctx)
-  slots.install(createSlotRenderer())
+  slots.install(createSlotRenderer(slots.componentOverrides))
   ctx.reflect.provide('uiRenderer', {
     mount: (container: HTMLElement): (() => void) => {
       const root = mountApp(container, buildRenderApp({ ctx }))

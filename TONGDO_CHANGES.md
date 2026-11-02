@@ -7,6 +7,7 @@
 | 改动 | 类别 | 位置 | 原因 | 能否去掉 |
 |---|---|---|---|---|
 | 文案覆盖层 `ctx.locale.overrideTexts(source, texts)` | 通用扩展接口 | `packages/client/locale`（实现、测试 `tests/text-overrides.client.spec.ts`、中英 README） | DSH 的文案字典每个「命名空间 + 语言」只能注册一次，下游无法替换个别文案；与 `theme.overrideTokens` 对称补齐文案层 | 上游提供等价的文案覆盖接口后可去掉 |
+| 组件覆盖层 `ctx.slots.overrideComponent(source, target, component)` | 通用扩展接口 | `packages/client/ui-renderer`（`src/client/component-overrides.ts`、渲染器三处条目渲染、`registry.ts`、测试 `tests/component-overrides.client.spec.tsx`、中英 README） | DSH 的结构节点（窗口外框、侧栏、会话头、输入框外壳）只能整行替换，替换后要重写其注入数据与子扩展位授权；覆盖层只换组件，保留原注册的数据与授权，与 `overrideTokens`、`overrideTexts` 对称 | 上游提供等价的组件覆盖接口后可去掉 |
 
 ## 核心仓库如何使用这些改动
 

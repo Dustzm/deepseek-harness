@@ -35,6 +35,10 @@ kind: "package-reference"
 
 业务插件注册普通 Slot entry 或可复用 Component Factory；渲染器在渲染位置把运行时的会话与 Workspace observable source 绑定为 selector 钩子。插件通过推导出的 Component props 收到标准 scope props——它绝不导入渲染器，也不触碰 React 内部机制。每个由 renderer 创建的 Component 都能渲染 Factory occurrence，Factory 也能暴露由调用方选择的局部 Component，而无需在包之间共享实现值。
 
+### 覆盖条目的组件
+
+`ctx.slots.overrideComponent(source, target, component)` 让一条已注册的 entry 改用另一个组件渲染，entry 本身仍保持注册。覆盖组件收到的 props 与原组件完全相同：注入数据、store、标准 props、`t`，以及该 entry 声明的子 slot 的 `renderSlot`。`target` 写 slot 名，再按 slot 种类指定 entry：single slot 不写其他字段，keyed slot 写 `key`，list slot 写 `id`；任何种类都可写 `registrant`（注册方插件名），这是 chain entry 唯一可用的定位方式。slot 必须已声明，因此在 `ctx.slots.inject(name, …)` 里调用；slot 未声明或定位字段与种类不符时抛错。覆盖层按 `source` 与 target 区分：同一组合再次调用会替换该层，最新的匹配层胜出；返回的 disposer 与调用方插件卸载一样，会恢复上一层或原注册组件。组件 props 不与 entry 做类型核对，因为其中包含注册方的注入面；请用注册方导出的 props 类型声明覆盖组件。该调用不声明新的子 slot。
+
 -----
 
 <a id="understand-the-implementation"></a>
