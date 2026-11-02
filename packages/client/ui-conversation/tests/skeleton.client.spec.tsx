@@ -413,8 +413,7 @@ describe('Hero chrome', () => {
     const view = render(<HeroShell t={makeTranslate(en, commonEn)} renderSlot={renderSlot} />)
     expect(view.getByText('Into the Unknown')).toBeTruthy()
     expect(view.getByText('Preview')).toBeTruthy()
-    expect(renderSlot).toHaveBeenCalledOnce()
-    expect(renderSlot.mock.calls[0]?.[0]).toBe('conversation.hero.brand.mark')
+    expect(renderSlot.mock.calls.map(call => call[0])).toEqual(['conversation.hero.brand.mark', 'conversation.hero.subtitle'])
     const brandMarkOwner = renderSlot.mock.calls[0]?.[1]
     if (brandMarkOwner === undefined || !('size' in brandMarkOwner) || !('className' in brandMarkOwner)) {
       throw new Error('hero brand-mark owner must provide size and className')
@@ -422,6 +421,14 @@ describe('Hero chrome', () => {
     expect(brandMarkOwner.size).toBe(34)
     expect(brandMarkOwner.className).toBeTypeOf('string')
     expect(renderSlot.mock.calls[0]?.[2]?.fallback).toBeTruthy()
+  })
+
+  it('omits the preview badge when the locale layer clears its text', () => {
+    const base = makeTranslate(en, commonEn)
+    const t: HeroShellProps['t'] = (key, params) => key === 'hero.preview' ? '' : base(key, params)
+    const view = render(<HeroShell t={t} renderSlot={() => null} />)
+    const headline = view.getByText('Into the Unknown')
+    expect(headline.parentElement?.childElementCount).toBe(1)
   })
 })
 
@@ -884,6 +891,15 @@ describe('ConversationRoot resident composer', () => {
     // choices are only open before the first message.
     expect(b.slotCalls).toContain('conversation.hero.agentPreset')
     expect(b.slotCalls).toContain('conversation.hero.options')
+  })
+
+  it('renders the hero subtitle and footer only for a blank Session', () => {
+    const blank = mount(sessionSnapshotOf({ blank: true }))
+    expect(blank.slotCalls).toContain('conversation.hero.subtitle')
+    expect(blank.slotCalls).toContain('conversation.hero.footer')
+    const started = mount(sessionSnapshotOf())
+    expect(started.slotCalls).not.toContain('conversation.hero.subtitle')
+    expect(started.slotCalls).not.toContain('conversation.hero.footer')
   })
 
   it('seats the New Session options after the agent-preset chip, and only for a Session', () => {

@@ -268,6 +268,10 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'conversation.hero.agentPreset': { kind: 'single'; scope: 'session-maybe'; owner: HeroAgentPresetOwnerProps }
     /** Compact options right-aligned in the New Session row after the workspace and preset controls; rendered only with a Session. */
     'conversation.hero.options': { kind: 'list'; scope: 'session' }
+    /** One line below the blank-Session headline, such as a greeting; rendered only in the hero. */
+    'conversation.hero.subtitle': { kind: 'single'; scope: 'session-maybe' }
+    /** Full-width entries below the blank-Session composer, such as shortcuts or recent work; rendered only in the hero. */
+    'conversation.hero.footer': { kind: 'list'; scope: 'session-maybe' }
     /** Full-width entries above the composer card. */
     'conversation.input.dock': { kind: 'list'; scope: 'session'; owner: InputZone }
     /** Floating entries rendered inside the resident composer card. */
@@ -314,6 +318,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
         'conversation.hero.workspace': { kind: 'single'; scope: 'root' }
         'conversation.hero.agentPreset': { kind: 'single'; scope: 'session-maybe' }
         'conversation.hero.options': { kind: 'list'; scope: 'session' }
+        'conversation.hero.subtitle': { kind: 'single'; scope: 'session-maybe' }
+        'conversation.hero.footer': { kind: 'list'; scope: 'session-maybe' }
       }
       inject: ConversationInjected
       locale: 'conversation'

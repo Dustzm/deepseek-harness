@@ -65,7 +65,7 @@ export function WorkspaceChip({ buttonRef, label, menuOpen = false, onClick, t }
 export interface HeroShellProps {
   /** The owner's locale seat, passed down as a plain prop. */
   t: HeroTranslate
-  /** Authorized renderer for the hero brand-mark slot. */
+  /** Authorized renderer for the hero brand-mark and subtitle slots. */
   renderSlot: ConversationContentProps['renderSlot']
   /** Overlay content after the stack (modals). */
   children?: ReactNode
@@ -131,6 +131,8 @@ function HeroFish({ hovering }: { hovering: boolean }) {
  */
 export function HeroShell({ t, renderSlot, children }: HeroShellProps) {
   const [hovering, setHovering] = useState(false)
+  // A deployment that clears the badge text through its locale layer removes the badge.
+  const preview = t('hero.preview')
   return (
     <div className={css.root}>
       <div className={css.stack}>
@@ -152,9 +154,10 @@ export function HeroShell({ t, renderSlot, children }: HeroShellProps) {
           <span className={css.titleGroup}>
             {/* Own element: keeps the headline text addressable apart from the badge. */}
             <span>{t('hero.headline')}</span>
-            <span className={css.previewBadge}>{t('hero.preview')}</span>
+            {preview === '' ? null : <span className={css.previewBadge}>{preview}</span>}
           </span>
         </div>
+        {renderSlot('conversation.hero.subtitle', {})}
         <div className={css.body}>
           {/* The composer remains mounted outside this component. */}
         </div>
