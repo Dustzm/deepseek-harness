@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it, onTestFinished } from 'vitest'
-import { applyClientProductIdentity } from '../product-identity.ts'
+import { applyClientProductIdentity, bootPageMetadata } from '../product-identity.ts'
 
 /** An output directory holding the copied `public/` identity files. */
 async function output() {
@@ -34,4 +34,18 @@ it('sets the manifest names and replaces each favicon from the build variables',
 it('rejects an icon that is not an SVG file', async () => {
   const root = await output()
   await expect(applyClientProductIdentity(root, { DSH_CLIENT_ICON: join(root, 'icon.png') })).rejects.toThrow(/DSH_CLIENT_ICON must name an SVG file/)
+})
+
+it('writes the boot marks beside the page and names them in the boot metadata', async () => {
+  const root = await output()
+  const mark = join(root, 'mark.svg')
+  await writeFile(mark, '<svg>mark</svg>')
+  await applyClientProductIdentity(root, { DSH_CLIENT_BOOT_MARK: mark, DSH_CLIENT_BOOT_MARK_DARK: mark })
+  expect(await readFile(join(root, 'boot-mark.svg'), 'utf8')).toBe('<svg>mark</svg>')
+  expect(await readFile(join(root, 'boot-mark-dark.svg'), 'utf8')).toBe('<svg>mark</svg>')
+  expect(bootPageMetadata({ DSH_CLIENT_BOOT_MARK: mark, DSH_CLIENT_BOOT_HINT: 'Starting "now"' })).toBe(
+    '<meta name="dsh-boot-mark" content="./boot-mark.svg" />\n    <meta name="dsh-boot-hint" content="Starting &quot;now&quot;" />',
+  )
+  expect(bootPageMetadata({ DSH_CLIENT_BOOT_HINT: '' })).toBe('<meta name="dsh-boot-hint" content="" />')
+  expect(bootPageMetadata({})).toBe('')
 })

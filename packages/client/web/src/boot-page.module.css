@@ -36,6 +36,27 @@
   color: var(--dsw-alias-label-primary, var(--dsh-boot-label-primary));
 }
 
+.mark {
+  width: 56px;
+  height: 56px;
+}
+
+.mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* One image per theme, switched by the marker the boot colors follow. */
+.mark .markDark,
+:global(body[data-ds-dark-theme]) .mark .markLight {
+  display: none;
+}
+
+:global(body[data-ds-dark-theme]) .mark .markDark {
+  display: block;
+}
+
 .hint {
   font-size: 12px;
   line-height: 18px;

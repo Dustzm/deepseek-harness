@@ -6,6 +6,19 @@
 import type { LoaderEntryState } from './loader-status.ts'
 import css from './boot-page.module.css'
 
+/**
+ * Page metadata a deployment sets at build time to brand the boot page:
+ * `dsh-boot-mark` / `dsh-boot-mark-dark` name images that replace the
+ * wordmark and spinner (the image animates itself), and `dsh-boot-hint`
+ * replaces the loading hint; an empty hint hides it.
+ */
+const BOOT_META = { mark: 'dsh-boot-mark', markDark: 'dsh-boot-mark-dark', hint: 'dsh-boot-hint' } as const
+
+/** Read one boot-page metadata value; absent when the page carries no such tag. */
+function bootMeta(name: string): string | undefined {
+  return document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`)?.content
+}
+
 /** Create a div with one module class and optional text. */
 function div(className: string | undefined, text?: string): HTMLDivElement {
   const el = document.createElement('div')
@@ -18,9 +31,11 @@ function div(className: string | undefined, text?: string): HTMLDivElement {
 export class BootPage {
   private readonly root: HTMLDivElement
   private readonly card: HTMLDivElement
+  /** Brand header: the configured mark, or the built-in wordmark. */
   private readonly wordmark: HTMLDivElement
   private readonly spinner: HTMLDivElement
-  private readonly hint: HTMLDivElement
+  /** Loading content below the header while nothing failed. */
+  private readonly loading: readonly HTMLDivElement[]
   private readonly states = new Map<string, LoaderEntryState>()
   private readonly active = new Set<string>()
   private total = 0
@@ -34,11 +49,15 @@ export class BootPage {
     this.root = div(css.boot)
     this.root.dataset.dshBoot = ''
     this.card = div(css.card)
-    this.wordmark = div(css.wordmark, 'HARNESS')
+    const mark = bootMeta(BOOT_META.mark)
+    this.wordmark = mark === undefined ? div(css.wordmark, 'HARNESS') : bootMark(mark, bootMeta(BOOT_META.markDark) ?? mark)
     this.spinner = div(css.spinner)
     this.spinner.dataset.dshBootSpinner = ''
-    this.hint = div(css.hint, 'Loading plugins…')
-    this.card.append(this.wordmark, this.spinner, this.hint)
+    const hintText = bootMeta(BOOT_META.hint) ?? 'Loading plugins…'
+    const hint = hintText === '' ? [] : [div(css.hint, hintText)]
+    // A configured mark carries its own animation, so it replaces the spinner.
+    this.loading = mark === undefined ? [this.spinner, ...hint] : hint
+    this.card.append(this.wordmark, ...this.loading)
     this.root.append(this.card)
     container.append(this.root)
     this.updateProgress()
@@ -83,8 +102,8 @@ export class BootPage {
   private render(): void {
     const failed = [...this.states].filter(([, state]) => state === 'failed').map(([id]) => id)
     if (this.failure === undefined && failed.length === 0) {
-      if (this.spinner.parentElement !== this.card) {
-        this.card.replaceChildren(this.wordmark, this.spinner, this.hint)
+      if (this.card.lastElementChild !== (this.loading.at(-1) ?? this.wordmark)) {
+        this.card.replaceChildren(this.wordmark, ...this.loading)
       }
       return
     }
@@ -100,4 +119,26 @@ export class BootPage {
     const ratio = this.total === 0 ? 0 : Math.min(this.active.size / this.total, 1)
     this.spinner.style.setProperty('--dsh-boot-arc', `${String(Math.round(72 + ratio * 216))}deg`)
   }
+}
+
+/**
+ * Build the configured brand mark: one image per theme, switched by the same
+ * dark-theme marker the boot page colors follow. The page title names it.
+ * @param light - image URL for the light theme.
+ * @param dark - image URL for the dark theme.
+ * @returns the mark element.
+ */
+function bootMark(light: string, dark: string): HTMLDivElement {
+  const mark = div(css.mark)
+  mark.dataset.dshBootMark = ''
+  mark.setAttribute('role', 'img')
+  mark.setAttribute('aria-label', document.title)
+  for (const [src, className] of [[light, css.markLight], [dark, css.markDark]] as const) {
+    const image = document.createElement('img')
+    image.src = src
+    image.alt = ''
+    image.className = className ?? ''
+    mark.append(image)
+  }
+  return mark
 }

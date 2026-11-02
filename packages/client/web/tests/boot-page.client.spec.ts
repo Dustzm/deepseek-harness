@@ -2,7 +2,18 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { BootPage } from '../src/boot-page.ts'
 
-afterEach(() => { document.body.innerHTML = '' })
+afterEach(() => {
+  document.body.innerHTML = ''
+  document.head.querySelectorAll('meta[name^="dsh-boot-"]').forEach((tag) => { tag.remove() })
+})
+
+/** Add the build-time boot metadata a deployment writes into the page head. */
+function meta(name: string, content: string): void {
+  const tag = document.createElement('meta')
+  tag.name = name
+  tag.content = content
+  document.head.append(tag)
+}
 
 function mount() {
   const el = document.createElement('div')
@@ -57,5 +68,30 @@ describe('BootPage', () => {
     const { el, page } = mount()
     page.dispose()
     expect(el.childNodes).toHaveLength(0)
+  })
+
+  it('replaces the wordmark and spinner with the configured mark and hides an empty hint', () => {
+    meta('dsh-boot-mark', './boot-mark.svg')
+    meta('dsh-boot-mark-dark', './boot-mark-dark.svg')
+    meta('dsh-boot-hint', '')
+    document.title = 'Product'
+    const { el, page } = mount()
+    const mark = el.querySelector('[data-dsh-boot-mark]')
+    expect(mark?.getAttribute('aria-label')).toBe('Product')
+    expect([...mark?.querySelectorAll('img') ?? []].map(image => image.getAttribute('src'))).toEqual(['./boot-mark.svg', './boot-mark-dark.svg'])
+    expect(el.textContent).not.toContain('HARNESS')
+    expect(el.textContent).not.toContain('Loading plugins…')
+    expect(el.querySelector('[data-dsh-boot-spinner]')).toBeNull()
+    page.setState('x', 'failed')
+    expect(el.querySelector('[data-dsh-boot-mark]')).toBe(mark)
+    expect(el.textContent).toContain('Failed to load plugins')
+  })
+
+  it('uses the light mark for both themes without a dark one, and shows a configured hint', () => {
+    meta('dsh-boot-mark', './boot-mark.svg')
+    meta('dsh-boot-hint', 'Starting…')
+    const { el } = mount()
+    expect([...el.querySelectorAll('[data-dsh-boot-mark] img')].map(image => image.getAttribute('src'))).toEqual(['./boot-mark.svg', './boot-mark.svg'])
+    expect(el.textContent).toContain('Starting…')
   })
 })
