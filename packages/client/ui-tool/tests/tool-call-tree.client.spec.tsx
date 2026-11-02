@@ -8,7 +8,7 @@ import type { SessionSnapshot } from '@deepseek-ai/dsh-api-session-controller/cl
 import type { ToolCallBlock, ToolResultNode } from '@deepseek-ai/dsh-client-ui-chat/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
-import type { ToolCallOwnerProps, ToolTreeProps } from '../src/client/contract/slots.ts'
+import type { ToolCallOwnerProps, ToolCallRowActionOwnerProps, ToolTreeProps } from '../src/client/contract/slots.ts'
 import { ToolCallTree } from '../src/client/tool/ToolCallTree.tsx'
 import { zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
 import { PartialArguments } from '@deepseek-ai/dsh-util-values'
@@ -27,10 +27,15 @@ function props(
   block: ToolCallBlock,
   home?: string,
   owners?: ToolCallOwnerProps[],
+  actions?: ToolCallRowActionOwnerProps[],
 ): ToolTreeProps {
   const snapshot = {} as SessionSnapshot
   const useSession = ((selector: (value: SessionSnapshot) => unknown) => selector(snapshot)) as ToolTreeProps['useSession']
-  const renderSlot = ((_key: string, owner: ToolCallOwnerProps, options?: { fallback?: React.ReactNode }) => {
+  const renderSlot = ((key: string, owner: ToolCallOwnerProps & ToolCallRowActionOwnerProps, options?: { fallback?: React.ReactNode }) => {
+    if (key === 'tool.call.row.action') {
+      actions?.push(owner)
+      return null
+    }
     owners?.push(owner)
     return options?.fallback ?? null
   }) as unknown as ToolTreeProps['renderSlot']
@@ -73,6 +78,15 @@ describe('ToolCallTree', () => {
     const next = { ...block, subCalls: children.map((child, index) => index === 42 ? changed : child) }
     view.rerender(<ToolCallTree {...initial} node={{ ...initial.node, data: { root: next } }} />)
     expect(owners.map(owner => owner.callId)).toEqual(['parent', 'child-42'])
+  })
+
+  it('hands row actions the call state with the row title and summary, and keeps an empty action column out of layout', () => {
+    const actions: ToolCallRowActionOwnerProps[] = []
+    const failed = { ...root('w1', { name: 'write', argsRaw: '{"path":"notes.txt","content":"hi"}' }), isError: true }
+    const view = render(<ToolCallTree {...props(failed, undefined, undefined, actions)} />)
+    expect(actions).toEqual([{ callId: 'w1', toolName: 'write', state: 'error', title: t('tool.title.write'), summary: 'notes.txt' }])
+    const column = view.container.querySelector('[data-chat-call-id="w1"]')?.children[1]
+    expect(column?.childElementCount).toBe(0)
   })
 
   it('dispatches preparation through the existing keyed toolview with no argument fields', () => {
@@ -194,10 +208,10 @@ describe('ToolCallTree', () => {
         reason: 'not authorized',
       },
     }
-    const renderSlot = vi.fn(() => <div data-testid="keyed-skill" />)
+    const renderSlot = vi.fn((...args: unknown[]) => args[0] === 'tool.call.toolview' ? <div data-testid="keyed-skill" /> : null)
     const view = render(<ToolCallTree {...props(block)} renderSlot={renderSlot as ToolTreeProps['renderSlot']} />)
 
-    expect(renderSlot).not.toHaveBeenCalled()
+    expect(renderSlot.mock.calls.map(([key]) => key)).toEqual(['tool.call.row.action'])
     expect(view.queryByTestId('keyed-skill')).toBeNull()
     expect(view.getByText('Auto review 已拒绝')).toBeTruthy()
   })

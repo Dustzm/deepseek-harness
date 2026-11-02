@@ -10,6 +10,7 @@ import type {
 import type { MessageImageLoader, MessageImageSource } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { AskUserQuestionAnswerItem, AskUserQuestionItem } from '@deepseek-ai/dsh-user-questions/types'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
+import type { ToolRowState } from '../tool/models/tool-call-model.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
@@ -42,7 +43,28 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * slot.
      */
     'tool.call.images': { kind: 'single'; scope: 'session'; owner: ToolImagesOwnerProps }
+    /**
+     * Actions trailing one Tool call's summary row, aligned with its first line.
+     * Every call at every stage renders the list; each entry decides from the
+     * row state whether it shows anything. An empty list leaves the row layout
+     * unchanged; a non-empty one narrows the row by the actions' width.
+     */
+    'tool.call.row.action': { kind: 'list'; scope: 'session'; owner: ToolCallRowActionOwnerProps }
   }
+}
+
+/** Owner currency of `tool.call.row.action`: the call identity and the row as the user sees it. */
+export interface ToolCallRowActionOwnerProps {
+  /** Call identity, stable across all stages. */
+  callId: string
+  /** Wire Tool name. */
+  toolName: string
+  /** Row state: `error` for a failed call, `stopped` for an interrupted one. */
+  state: ToolRowState
+  /** Localized row title, the same text the generic row shows. */
+  title: string
+  /** Argument summary the generic row shows after the title; empty when the call has none. */
+  summary: string
 }
 
 /** Owner currency of the Tool image gallery slot: references plus the loader. */
@@ -152,6 +174,6 @@ export type ToolHostInfoInjected = {
 
 /** Full props of the Tool call-tree renderer registered as a tool-call Chat Node. */
 export type ToolTreeProps = PropsRuntime<'conversation.chat.node', 'tool-call'>
-  & PropsRenderSlots<'tool.call.toolview'>
+  & PropsRenderSlots<'tool.call.toolview' | 'tool.call.row.action'>
   & PropsLocale<'conversation'>
   & InjectFace<ToolHostInfoInjected>

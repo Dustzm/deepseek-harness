@@ -1,7 +1,7 @@
 /** Root/subcall Tool composition with one keyed atomic dispatch path. */
 import { memo, useMemo, type ReactNode } from 'react'
 import type { ToolCallBlock } from '@deepseek-ai/dsh-client-ui-chat/client'
-import type { ToolCallOwnerProps, ToolCallPhaseProps, ToolTreeProps } from '../contract/slots.ts'
+import type { ToolCallOwnerProps, ToolCallPhaseProps, ToolCallRowActionOwnerProps, ToolTreeProps } from '../contract/slots.ts'
 import { toolRowModel } from './models/tool-call-model.ts'
 import { GenericToolCard } from './toolviews/GenericToolCard.tsx'
 import css from './ToolCallTree.module.css'
@@ -37,22 +37,26 @@ const ToolCall = memo(function ToolCall({
     useDisclosure,
     inspect: inspectCall === undefined ? undefined : () => { inspectCall(callId) },
   }), [callId, toolName, call, openFile, cwd, home, loadImage, inspectCall, useDisclosure])
-  const autoReviewDenied = useMemo(
-    () => call.phase === 'result' && toolRowModel(toolName, call.block).autoReviewDenial !== null,
-    [toolName, call],
-  )
+  const row = useMemo(() => toolRowModel(toolName, call.block, cwd, home), [toolName, call, cwd, home])
+  const autoReviewDenied = call.phase === 'result' && row.autoReviewDenial !== null
+  const actionOwner: ToolCallRowActionOwnerProps = useMemo(() => ({
+    callId, toolName, state: row.state, title: t(row.titleKey), summary: row.summary,
+  }), [callId, toolName, row, t])
   return (
     <div
       className={css.callRow}
       data-chat-anchor-key={`call:${callId}`}
       data-chat-call-id={callId}
     >
-      {autoReviewDenied
-        ? <GenericToolCard {...owner} t={t} />
-        : renderSlot('tool.call.toolview', owner, {
-          entryKey: toolName,
-          fallback: <GenericToolCard {...owner} t={t} />,
-        })}
+      <div className={css.callView}>
+        {autoReviewDenied
+          ? <GenericToolCard {...owner} t={t} />
+          : renderSlot('tool.call.toolview', owner, {
+            entryKey: toolName,
+            fallback: <GenericToolCard {...owner} t={t} />,
+          })}
+      </div>
+      <div className={css.rowActions}>{renderSlot('tool.call.row.action', actionOwner)}</div>
       {children}
     </div>
   )

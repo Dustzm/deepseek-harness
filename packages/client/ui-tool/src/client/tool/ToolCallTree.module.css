@@ -1,5 +1,28 @@
 .callRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   border-radius: var(--dsw-radius-sm);
+}
+
+.callView {
+  min-width: 0;
+}
+
+/* `tool.call.row.action` entries trail the summary row's first line; an empty
+   list collapses this column to zero width. */
+.rowActions {
+  display: flex;
+  align-items: center;
+  align-self: start;
+  height: calc(24px + var(--dsh-content-font-delta, 0px));
+}
+
+.rowActions:empty {
+  display: none;
+}
+
+.callRow > :not(.callView, .rowActions) {
+  grid-column: 1 / -1;
 }
 
 .subCalls {
