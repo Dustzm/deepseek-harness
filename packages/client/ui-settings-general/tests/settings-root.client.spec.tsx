@@ -3,7 +3,7 @@ import type { ShortcutCatalogEntry, ShortcutCommandId } from '@deepseek-ai/dsh-c
 import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useEffect, useState } from 'react'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { createSettingsShellStore } from '../src/client/shell-store.ts'
 import { allowAllAccess, bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -390,6 +390,25 @@ describe('SettingsPanel navigation', () => {
     // including one this package never heard of — shares the gear.
     expect(new Set(glyphs.slice(0, 5)).size).toBe(5)
     expect(glyphs[5]).toBe(glyphs[0])
+  })
+
+  it('draws a registered section icon in place of the built-in glyph for that section only', () => {
+    const { renderSlot } = mount({
+      rows: [
+        { id: 'general', order: 0, label: 'General' },
+        { id: 'contributed', order: 10, label: 'Contributed' },
+      ],
+    })
+    const builtIn = renderSlot.getMockImplementation()
+    renderSlot.mockImplementation(((key: string, owner: unknown, opts?: { entryKey?: string; fallback?: import('react').ReactNode }) =>
+      key === 'settings.section.icon' && opts?.entryKey === 'contributed'
+        ? <svg data-testid="contributed-icon" data-size={(owner as { size: number }).size} />
+        : builtIn?.(key as never, owner as never, opts as never)) as SettingsRootComponentProps['renderSlot'])
+    openPanel()
+    const icon = within(screen.getByRole('button', { name: 'Contributed' })).getByTestId('contributed-icon')
+    expect(icon.getAttribute('data-size')).toBe('16')
+    expect(within(screen.getByRole('button', { name: 'General' })).queryByTestId('contributed-icon')).toBeNull()
+    expect(screen.getByRole('button', { name: 'General' }).querySelector('svg')).not.toBeNull()
   })
 
   it('switches the rendered section on nav click', () => {
