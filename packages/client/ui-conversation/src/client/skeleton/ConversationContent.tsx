@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import { workspaceDisplayTitle } from '@deepseek-ai/dsh-api-workspace-controller/default-workspace'
-import type { ConversationContentProps, ConversationViewsProps, InputZone } from '../contract/slots.ts'
+import type {
+  ConversationContentProps, ConversationViewsProps, HeroWorkspaceChipOwnerProps, InputZone,
+} from '../contract/slots.ts'
 import { HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
 import css from './ConversationRoot.module.css'
 
@@ -107,15 +109,17 @@ export function ConversationContent(props: ConversationContentProps) {
     ? undefined
     : workspaceDisplayTitle(storedChipTitle, t('workspace.defaultName'))
 
+  const chipOwner: HeroWorkspaceChipOwnerProps = {
+    buttonRef: pickerAnchor,
+    label: chipTitle,
+    menuOpen: pickerOpen,
+    onClick: () => { setPickerOpen(open => !open) },
+  }
   const heroWorkspaceRow = (
     <div className={css.heroWorkspaceRow}>
-      <WorkspaceChip
-        buttonRef={pickerAnchor}
-        label={chipTitle}
-        menuOpen={pickerOpen}
-        onClick={() => { setPickerOpen(open => !open) }}
-        t={t}
-      />
+      {renderSlot('conversation.hero.workspace.chip', chipOwner, {
+        fallback: <WorkspaceChip {...chipOwner} t={t} />,
+      })}
       {renderSlot('conversation.hero.workspace', {
         open: pickerOpen,
         anchorRef: pickerAnchor,

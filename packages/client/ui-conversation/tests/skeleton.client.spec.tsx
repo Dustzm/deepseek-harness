@@ -33,7 +33,7 @@ import type { InputBarProps } from '../src/client/skeleton/InputBar.tsx'
 import type {
   ComposerBarOwnerProps, ConversationContentInputProps, ConversationContentProps,
   ConversationHeaderLineageOwnerProps, ConversationSessionHeaderSlotProps, ConversationSessionSlotProps, ConversationSlotProps,
-  ConversationViewActionsOwnerProps, ConversationViewsProps,
+  ConversationViewActionsOwnerProps, ConversationViewsProps, HeroWorkspaceChipOwnerProps,
 } from '../src/client/contract/slots.ts'
 import type { ViewTab } from '../src/client/contract/views.ts'
 
@@ -139,6 +139,8 @@ function mount(
     nestedSubagent?: boolean
     /** A composer block another plugin raised for this session. */
     composerBlock?: { reason: string }
+    /** Registered occupant of the hero Workspace chip seat; omitted renders the hero's own chip. */
+    heroChip?: (owner: HeroWorkspaceChipOwnerProps) => ReactNode
     /** Mutable view ledger used by registration-order regressions. */
     viewTabs?: ViewTab[]
     /** Persisted ids of unpinned View tabs. */
@@ -208,6 +210,9 @@ function mount(
       seatOwners.push({ key, owner })
     }
     if (key === 'conversation.hero.workspace') { pickerOwner = owner; return null }
+    if (key === 'conversation.hero.workspace.chip') {
+      return options.heroChip === undefined ? opts?.fallback ?? null : options.heroChip(owner as HeroWorkspaceChipOwnerProps)
+    }
     if (key === 'conversation.session.header.views.actions') {
       actionsOwner = owner as ConversationViewActionsOwnerProps
       return <button type="button" role="menuitem" onClick={actionsOwner.onDismiss}>Header view action</button>
@@ -601,6 +606,20 @@ describe('ConversationRoot resident composer', () => {
     act(() => { owner.onPick(wid('second')) })
     expect(b.retargetWorkspace).toHaveBeenCalledWith(wid('second'))
     expect(b.view.getByText('Selected Folder')).toBeTruthy()
+  })
+
+  it('hero phase: a registered chip replaces the folder chip and still opens the picker', () => {
+    const b = mount(sessionSnapshotOf({ blank: true }), undefined, undefined, {
+      heroChip: owner => (
+        <button type="button" ref={owner.buttonRef} aria-expanded={owner.menuOpen} onClick={owner.onClick}>
+          {`work in ${owner.label ?? '-'}`}
+        </button>
+      ),
+    })
+    expect(b.view.queryByRole('button', { name: '选择工作区' })).toBeNull()
+    fireEvent.click(b.view.getByRole('button', { name: 'work in one' }))
+    expect((b.pickerOwner() as { open: boolean }).open).toBe(true)
+    expect(b.view.getByRole('button', { name: 'work in one' }).getAttribute('aria-expanded')).toBe('true')
   })
 
   it('keeps a rejected first prompt engaging instead of returning to the Hero', () => {

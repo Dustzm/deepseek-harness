@@ -262,6 +262,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'conversation.composer': { kind: 'chain'; scope: 'session'; owner: ComposerChainProps }
     /** Workspace picker shown by the blank-session Hero. */
     'conversation.hero.workspace': { kind: 'single'; scope: 'root'; owner: EmptyWorkspaceOwnerProps }
+    /** Trigger that opens the blank-session Workspace picker; without a registration the hero shows its folder chip. */
+    'conversation.hero.workspace.chip': { kind: 'single'; scope: 'root'; owner: HeroWorkspaceChipOwnerProps }
     /** Brand mark shown before the blank-session headline. */
     'conversation.hero.brand.mark': { kind: 'single'; scope: 'root'; owner: HeroBrandMarkOwnerProps }
     /** Agent-preset control staged for a New Session. */
@@ -321,6 +323,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
         'conversation.input.dock': { kind: 'list'; scope: 'session' }
         'conversation.hero.brand.mark': { kind: 'single'; scope: 'root' }
         'conversation.hero.workspace': { kind: 'single'; scope: 'root' }
+        'conversation.hero.workspace.chip': { kind: 'single'; scope: 'root' }
         'conversation.hero.agentPreset': { kind: 'single'; scope: 'session-maybe' }
         'conversation.hero.options': { kind: 'list'; scope: 'session' }
         'conversation.hero.subtitle': { kind: 'single'; scope: 'session-maybe' }
@@ -646,6 +649,18 @@ export type ConversationSessionHeaderSlotProps =
 /** Full props of the draft-attachment renderer. */
 export type ComposerAttachmentsProps =
   PropsRuntime<'conversation.input.attachments'> & PropsLocale<'conversation'>
+
+/** Owner share of the blank-session Workspace picker trigger. */
+export interface HeroWorkspaceChipOwnerProps {
+  /** Ref the picker anchors its popover to; attach it to the trigger button. */
+  buttonRef: RefObject<HTMLButtonElement>
+  /** Display title of the selected Workspace; undefined before one is chosen. */
+  label?: string | undefined
+  /** Whether the picker popover is open. */
+  menuOpen: boolean
+  /** Toggle the picker popover. */
+  onClick: () => void
+}
 
 /** Owner share common to blank-session Workspace pickers. */
 export interface EmptyWorkspaceOwnerProps {
