@@ -19,7 +19,7 @@ import clsx from 'clsx'
 import {
   Button, HoverCardGroup, IconArchiveCheckOutlineRegular, IconArchiveOffOutlineRegular, IconArchiveOutlineRegular,
   IconChevronsUpDownOutlineRegular, IconClockOutlineRegular, IconCloseFillRegular,
-  IconFlatListOutlineRegular, IconFolderCloseRegular, IconProjectAddOutlineRegular,
+  IconChecklistOutlineRegular, IconFlatListOutlineRegular, IconFolderCloseRegular, IconProjectAddOutlineRegular,
   IconQueueOutlineRegular, IconSearchOutlineRegular, IconSlidersTwoOutlineRegular,
   IconWorkspaceTreeOutlineRegular, Menu, Modal, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -34,7 +34,7 @@ import type { WorkspaceBrowserProps } from '../contract/slots.ts'
 import type { ArchivedFilter, GroupNode, SessionNode, SessionOrderBy, SessionRowState } from '../tree.ts'
 import {
   deriveFlat, deriveGroups, deriveSearchResults, orderByRecency, owningGroupKey, owningParentFolder,
-  pinCurrentBlank, reconcileManualOrder, sessionMemberIds, UNGROUPED_KEY,
+  pinCurrentBlank, reconcileManualOrder, sectionByStatus, sessionMemberIds, UNGROUPED_KEY,
 } from '../tree.ts'
 import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './Rows.tsx'
 import { AnimatedRows } from './AnimatedRows.tsx'
@@ -158,6 +158,7 @@ function ViewOptionsMenu({ groupBy, orderBy, archivedFilter, onGroupPick, onOrde
         { id: 'workspace', label: t('groupBy.workspace'), icon: <IconFolderCloseRegular /> },
         { id: 'workspace-tree', label: t('groupBy.workspaceTree'), icon: <IconWorkspaceTreeOutlineRegular /> },
         { id: 'flat', label: t('groupBy.flat'), icon: <IconFlatListOutlineRegular /> },
+        { id: 'status', label: t('groupBy.status'), icon: <IconChecklistOutlineRegular /> },
         { type: 'separator' as const, id: 'order-by-separator' },
         { type: 'label' as const, id: 'order-by', text: t('orderBy.label') },
         { id: 'manual', label: t('orderBy.manual'), icon: <IconChevronsUpDownOutlineRegular /> },
@@ -174,7 +175,7 @@ function ViewOptionsMenu({ groupBy, orderBy, archivedFilter, onGroupPick, onOrde
         { default: 'hide-archived', show: 'show-archived', only: 'only-archived' }[archivedFilter],
       ]}
       onSelect={(id) => {
-        if (id === 'workspace' || id === 'workspace-tree' || id === 'flat') onGroupPick(id)
+        if (id === 'workspace' || id === 'workspace-tree' || id === 'flat' || id === 'status') onGroupPick(id)
         else if (id === 'manual' || id === 'updated') onOrderPick(id)
         else if (id === 'hide-archived') onArchivedFilterPick('default')
         else if (id === 'show-archived') onArchivedFilterPick('show')
@@ -685,11 +686,15 @@ function SessionTree({
   )
 }
 
-/** The flat "In one list" body: every session is one draggable top-level row. */
+/**
+ * The flat body. "In one list" draws every session as one draggable top-level
+ * row; "By status" draws the same rows under running, attention, and other
+ * section labels, without row dragging.
+ */
 function FlatList({
   list, sessionIds, rowState, onLeaveArchivedOnly, useSessionStatus, open, onSessionRenameRequest,
   usePanelInfo, setSessionOrder, workspaceReady, animationResetKey,
-  revealSessionId, onSessionRevealed, renderSlot, t,
+  revealSessionId, onSessionRevealed, renderSlot, byStatus, t,
 }: Pick<
   SessionTreeProps,
   | 'useSessionStatus'
@@ -708,6 +713,8 @@ function FlatList({
 > & {
   list: SessionListState
   sessionIds: readonly SessionId[]
+  /** Section rows by status instead of one reorderable list. */
+  byStatus: boolean
 }) {
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
   const statuses = useSessionStatus(s => s)
@@ -729,59 +736,75 @@ function FlatList({
     if (nextOrder !== undefined) setSessionOrder(FLAT_SESSION_ORDER_KEY, nextOrder)
   }
   const now = Date.now()
+  const sections = useMemo(() => byStatus ? sectionByStatus(rows) : undefined, [byStatus, rows])
+  const rowKeys = rows.length === 0
+    ? ['empty']
+    : sections === undefined
+      ? rows.map(row => `session:${row.id}`)
+      : sections.flatMap(section => [`status:${section.key}`, ...section.rows.map(row => `session:${row.id}`)])
+  const renderRow = (node: SessionNode, draggable: boolean) => {
+    const active = drag !== null && drag.pinned === node.pinned
+    const normalizeHalf = (half: 'before' | 'after'): 'before' | 'after' =>
+      node.blank ? 'after' : half
+    return (
+      <SessionNodeItem
+        key={node.id}
+        node={node}
+        currentId={currentId}
+        now={now}
+        onOpen={open}
+        onRenameRequest={onSessionRenameRequest}
+        renderSlot={renderSlot}
+        onReveal={node.id === revealSessionId
+          ? () => { onSessionRevealed(node.id) }
+          : undefined}
+        drag={draggable
+          ? {
+            start: () => {
+              dropCommitted.current = false
+              setDrag({ accountKey: FLAT_SESSION_ORDER_KEY, sessionId: node.id, pinned: node.pinned, over: null })
+            },
+            active,
+            marker: active && drag.over?.id === node.id ? drag.over.half : null,
+            hover: (half) => {
+              setDrag(current => current === null ? current : {
+                ...current, over: { id: node.id, half: normalizeHalf(half) },
+              })
+            },
+            drop: (half) => {
+              if (drag !== null) commitDrag(drag, { id: node.id, half: normalizeHalf(half) })
+            },
+            end: () => {
+              if (drag?.over !== null && drag?.over !== undefined) commitDrag(drag, drag.over)
+              else setDrag(null)
+              dropCommitted.current = false
+            },
+          }
+          : undefined}
+        t={t}
+      />
+    )
+  }
   return (
     <HoverCardGroup className={clsx(css.treeBody, css.wide)}>
       <AnimatedRows
         className={clsx(css.list, css.flatList)}
         label={t('section.sessions')}
-        rowKeys={rows.length === 0 ? ['empty'] : rows.map(row => `session:${row.id}`)}
+        rowKeys={rowKeys}
         ready={list.phase === 'ready' && workspaceReady && drag === null}
         resetKey={animationResetKey}
       >
         {rows.length === 0 && (
           <EmptySessions rowState={rowState} onLeaveArchivedOnly={onLeaveArchivedOnly} t={t} />
         )}
-        {rows.map((node) => {
-          const active = drag !== null && drag.pinned === node.pinned
-          const normalizeHalf = (half: 'before' | 'after'): 'before' | 'after' =>
-            node.blank ? 'after' : half
-          return (
-            <SessionNodeItem
-              key={node.id}
-              node={node}
-              currentId={currentId}
-              now={now}
-              onOpen={open}
-              onRenameRequest={onSessionRenameRequest}
-              renderSlot={renderSlot}
-              onReveal={node.id === revealSessionId
-                ? () => { onSessionRevealed(node.id) }
-                : undefined}
-              drag={{
-                start: () => {
-                  dropCommitted.current = false
-                  setDrag({ accountKey: FLAT_SESSION_ORDER_KEY, sessionId: node.id, pinned: node.pinned, over: null })
-                },
-                active,
-                marker: active && drag.over?.id === node.id ? drag.over.half : null,
-                hover: (half) => {
-                  setDrag(current => current === null ? current : {
-                    ...current, over: { id: node.id, half: normalizeHalf(half) },
-                  })
-                },
-                drop: (half) => {
-                  if (drag !== null) commitDrag(drag, { id: node.id, half: normalizeHalf(half) })
-                },
-                end: () => {
-                  if (drag?.over !== null && drag?.over !== undefined) commitDrag(drag, drag.over)
-                  else setDrag(null)
-                  dropCommitted.current = false
-                },
-              }}
-              t={t}
-            />
-          )
-        })}
+        {sections === undefined
+          ? rows.map(node => renderRow(node, true))
+          : sections.map(section => [
+            <div key={`status:${section.key}`} className={css.statusSection} data-row-key={`status:${section.key}`}>
+              {t(`section.status.${section.key}`)}
+            </div>,
+            ...section.rows.map(node => renderRow(node, false)),
+          ])}
       </AnimatedRows>
       <span className={css.fade} />
     </HoverCardGroup>
@@ -1268,7 +1291,7 @@ export function WorkspaceBrowser({
       <div className={css.sectionHeader}>
         {wide && (
           <span className={clsx(css.sectionLabel, css.wide, searchExpanded && css.sectionLabelHidden)}>
-            {groupBy === 'flat' ? t('section.sessions') : t('section.workspaces')}
+            {groupBy === 'flat' || groupBy === 'status' ? t('section.sessions') : t('section.workspaces')}
           </span>
         )}
         {wide && (
@@ -1417,7 +1440,7 @@ export function WorkspaceBrowser({
               t={t}
             />
           )
-          : groupBy === 'flat'
+          : groupBy === 'flat' || groupBy === 'status'
             ? (
               <FlatList
                 usePanelInfo={usePanelInfo}
@@ -1434,6 +1457,7 @@ export function WorkspaceBrowser({
                 setSessionOrder={saveSessionOrder}
                 revealSessionId={revealSessionId}
                 onSessionRevealed={acknowledgeSessionReveal}
+                byStatus={groupBy === 'status'}
                 t={t}
               />
             )

@@ -449,7 +449,7 @@ describe('WorkspaceBrowser', () => {
     expect(screen.getByText('分组方式')).toBeTruthy() // the menu heading label
     expect(screen.getAllByRole('separator')).toHaveLength(2)
     expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
-      '按工作区', '按工作区树', '单列表', '手动排序', '最近更新', '隐藏已归档', '全部对话（显示已归档）', '仅显示已归档',
+      '按工作区', '按工作区树', '单列表', '按状态', '手动排序', '最近更新', '隐藏已归档', '全部对话（显示已归档）', '仅显示已归档',
     ])
     expect(screen.getByRole('menuitem', { name: '按工作区' }).querySelector('svg')).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: '手动排序' }).querySelector('svg')).toBeTruthy()
@@ -725,6 +725,33 @@ describe('WorkspaceBrowser', () => {
     act(() => { b.store.actions.setGroupBy('flat') })
     fireEvent.doubleClick(screen.getByText('Alpha session'))
     expect(requestSessionRename).toHaveBeenCalledTimes(2)
+  })
+
+  it('lists Sessions under status sections without row dragging when grouped by status', () => {
+    const items = [summary('waiting', 3), summary('working', 2), summary('resting', 1)]
+    const b = mount({
+      useSessions: hook(sessionState(items)),
+      useWorkspaces: hook(workspaceState([workspace('alpha', items.map(item => item.id))])),
+      useSessionStatus: hook<SessionStatusSnapshot>(new Map([
+        [sid('working'), { running: true, pendingInteraction: undefined, completionUnread: false }],
+        [sid('waiting'), {
+          running: true, completionUnread: false,
+          pendingInteraction: { key: 'approval:1', kind: 'approval', sessionId: sid('waiting') } as SessionPendingInteraction,
+        }],
+      ])),
+    })
+    act(() => { b.store.actions.setGroupBy('status') })
+    const list = screen.getByRole('tree', { name: zh['section.sessions'] })
+    const lines = [...list.querySelectorAll('[data-row-key]')].map(row => row.getAttribute('data-row-key'))
+    expect(lines).toEqual([
+      'status:running', 'session:working', 'status:attention', 'session:waiting', 'status:other', 'session:resting',
+    ])
+    const label = (key: string) => list.querySelector(`[data-row-key="status:${key}"]`)?.textContent
+    expect([label('running'), label('attention'), label('other')])
+      .toEqual([zh['section.status.running'], zh['section.status.attention'], zh['section.status.other']])
+    expect(list.querySelector('[draggable="true"]')).toBeNull()
+    act(() => { b.store.actions.setGroupBy('flat') })
+    expect(list.querySelector('[data-row-key^="status:"]')).toBeNull()
   })
 
   it('renders both Session row lists for every visible row in the grouped tree and the flat list', () => {

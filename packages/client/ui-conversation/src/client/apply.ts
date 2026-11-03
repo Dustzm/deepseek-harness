@@ -488,6 +488,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
             lexicon: ABSENT_LEXICON,
             menuLauncher: ABSENT_MENU_LAUNCHER,
             contextMeter: uiConversation.contextMeter,
+            composerControlsBelow: uiConversation.composerControlsBelow,
           },
         }
       }
@@ -565,6 +566,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
           lexicon: shell.lexicon,
           menuLauncher: inputTriggers?.launcher ?? ABSENT_MENU_LAUNCHER,
           contextMeter: uiConversation.contextMeter,
+          composerControlsBelow: uiConversation.composerControlsBelow,
         },
       }
     },

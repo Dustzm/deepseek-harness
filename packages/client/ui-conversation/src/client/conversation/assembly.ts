@@ -20,6 +20,7 @@ import type {
 import { inspectRequestPrompt } from '../contract/request-inspection.ts'
 import { inspectSystemPrompt, type SystemPromptState } from '../contract/system-prompt.ts'
 import { ConversationNodeAssembler } from './assembler.ts'
+import { EffectClaims } from './claims.ts'
 import { ConversationEventRegistry } from './event-registry.ts'
 import { HistoricalImageCache } from './historical-images.ts'
 import { ConversationViewRegistry } from './view-registry.ts'
@@ -195,8 +196,12 @@ export class UiConversation extends Service {
   readonly userText: UserTextRegistry
   private readonly bindings = new WeakMapWithValues<SessionBinding, BindingRecord>()
   private readonly images: HistoricalImageCache
-  private readonly contextMeterVisible = createSnapshotStore<boolean>(true)
-  private contextMeterClaims = 0
+  private readonly contextMeterClaims = new EffectClaims()
+  private readonly composerControlsClaims = new EffectClaims()
+  private readonly contextMeterVisible: ObservableSnapshot<boolean> = {
+    getSnapshot: () => !this.contextMeterClaims.held.getSnapshot(),
+    subscribe: listener => this.contextMeterClaims.held.subscribe(listener),
+  }
 
   /**
    * @param ctx - owning Client context.
@@ -246,15 +251,26 @@ export class UiConversation extends Service {
    * @returns idempotent release.
    */
   claimContextMeter(): () => void {
-    const dispose = this.ctx.effect(() => {
-      this.contextMeterClaims += 1
-      this.contextMeterVisible.set(false)
-      return () => {
-        this.contextMeterClaims -= 1
-        if (this.contextMeterClaims === 0) this.contextMeterVisible.set(true)
-      }
-    }, 'uiConversation.claimContextMeter')
-    return () => { void dispose() }
+    return this.contextMeterClaims.claim(this.ctx, 'uiConversation.claimContextMeter')
+  }
+
+  /**
+   * Whether the composer draws its setting controls below the input card;
+   * `true` while any claim from `placeComposerControlsBelow()` is held.
+   */
+  get composerControlsBelow(): ObservableSnapshot<boolean> {
+    return this.composerControlsClaims.held
+  }
+
+  /**
+   * Move the composer's setting controls — the permission, plan, model, and
+   * status seats — out of the input card into a row below it, for the
+   * caller's lifetime. The attachment control, the left and right input
+   * seats, the activity seat, and the send button stay in the card.
+   * @returns idempotent release.
+   */
+  placeComposerControlsBelow(): () => void {
+    return this.composerControlsClaims.claim(this.ctx, 'uiConversation.placeComposerControlsBelow')
   }
 
   /**

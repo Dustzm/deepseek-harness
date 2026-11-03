@@ -103,6 +103,7 @@ interface BenchOptions {
   statusItems?: React.ReactNode
   contextPressure?: ContextPressureProjection
   contextMeter?: boolean
+  controlsBelow?: boolean
   footer?: React.ReactNode
   attachments?: readonly ComposerAttachment[]
   /** Upload states served for file-kind drafts (absent = every file is ready). */
@@ -205,6 +206,7 @@ function bench(over?: BenchOptions) {
     inputActions: shell.actions,
     keyboard: shell,
     useContextMeter: bindSnapshotSelector(createSnapshotStore<boolean>(over?.contextMeter ?? true)),
+    useComposerControlsBelow: bindSnapshotSelector(createSnapshotStore<boolean>(over?.controlsBelow ?? false)),
     addFiles: over?.addFiles ?? (() => null),
     useFileUploads: bindSnapshotSelector(createSnapshotStore<DraftFileUploads>(over?.fileUploads ?? {})),
     retryFileUpload: undefined,
@@ -1888,6 +1890,30 @@ it('places status readouts after the model selector and hides them while an acti
   expect(model.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   fireEvent.click(view.getByRole('button', { name: 'expand activity' }))
   expect(view.queryByRole('button', { name: 'status readout' })).toBeNull()
+})
+
+it('moves the setting seats into a row below the card while a placement claim is held', () => {
+  const entries = {
+    permissionEntry: <button>permission chip</button>, planEntry: <button>plan chip</button>,
+    modelEntry: <button>model choice</button>, statusItems: <button>status readout</button>,
+    leftItems: <button>left tool</button>,
+  }
+  const inCard = (name: string, view: ReturnType<typeof bench>['view']) =>
+    view.getByRole('button', { name }).closest('[data-composer-card]') !== null
+  const card = bench({ draft: 'draft', ...entries })
+  for (const name of ['permission chip', 'plan chip', 'model choice', 'status readout']) expect(inCard(name, card.view)).toBe(true)
+  expect(card.view.container.querySelector('[data-composer-controls]')).toBeNull()
+  cleanup()
+
+  const below = bench({ draft: 'draft', ...entries, controlsBelow: true })
+  const row = below.view.container.querySelector('[data-composer-controls]')
+  expect(row).not.toBeNull()
+  for (const name of ['permission chip', 'plan chip', 'model choice', 'status readout']) {
+    expect(inCard(name, below.view)).toBe(false)
+    expect(row?.contains(below.view.getByRole('button', { name }))).toBe(true)
+  }
+  expect(inCard('left tool', below.view)).toBe(true)
+  expect(below.view.getByLabelText(zh['input.send']).closest('[data-composer-card]')).not.toBeNull()
 })
 
 it('lets a toolbar activity replace accessories without replacing the draft editor or send action', () => {

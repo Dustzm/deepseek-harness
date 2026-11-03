@@ -525,6 +525,38 @@ export function deriveFlat(
     .map(session => sessionNode(session, list, statuses, pinned, archived))
 }
 
+/** Sections of the by-status list, in display order. */
+export const STATUS_SECTIONS = ['running', 'attention', 'other'] as const
+
+/** One by-status section key. */
+export type StatusSectionKey = typeof STATUS_SECTIONS[number]
+
+/** One non-empty by-status section of flat rows. */
+export interface StatusSection {
+  key: StatusSectionKey
+  rows: SessionNode[]
+}
+
+/**
+ * Partition flat rows by what each Session needs: a pending interaction puts a
+ * row under `attention`, a running Session or running direct subagent under
+ * `running`, and archived or idle rows under `other`.
+ * @param rows - rows in flat display order.
+ * @returns the non-empty sections in {@link STATUS_SECTIONS} order; each keeps its rows' flat order.
+ */
+export function sectionByStatus(rows: readonly SessionNode[]): StatusSection[] {
+  const buckets: Record<StatusSectionKey, SessionNode[]> = { running: [], attention: [], other: [] }
+  for (const row of rows) {
+    const key = row.archived
+      ? 'other'
+      : row.pendingInteraction !== undefined
+        ? 'attention'
+        : row.running || row.runningSubagentCount > 0 ? 'running' : 'other'
+    buckets[key].push(row)
+  }
+  return STATUS_SECTIONS.flatMap(key => buckets[key].length === 0 ? [] : [{ key, rows: buckets[key] }])
+}
+
 /**
  * Merge immediate title/Workspace substring matches with ranked Host content
  * matches. Local rows lead newest-first, content-only rows retain backend

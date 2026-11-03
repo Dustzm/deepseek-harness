@@ -175,6 +175,7 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
     inputActions: shell.actions,
     keyboard: shell,
     useContextMeter: bindSnapshotSelector(createSnapshotStore<boolean>(true)),
+    useComposerControlsBelow: bindSnapshotSelector(createSnapshotStore<boolean>(false)),
     addFiles: () => null,
     useFileUploads: bindSnapshotSelector(createSnapshotStore({})),
     retryFileUpload: undefined,

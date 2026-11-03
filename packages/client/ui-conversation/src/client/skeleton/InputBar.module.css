@@ -23,6 +23,28 @@
   display: none;
 }
 
+/* Setting controls moved below the card (uiConversation.placeComposerControlsBelow):
+   the mode chips start at the card's inner edge and the model and status
+   seats end at it; the row wraps before either group shrinks. */
+.controlsBelow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px 0;
+}
+
+.controlsBelowEnd {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  margin-left: auto;
+}
+
 .hero {
   /* No bottom pad in the centered hero, but the side clearance must survive:
      the hero wrapper is full-width on narrow viewports, so this padding is

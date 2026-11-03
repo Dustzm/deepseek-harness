@@ -373,6 +373,22 @@
   scrollbar-gutter: stable;
 }
 
+/* A by-status section label: a quiet caption row; the first one sits flush
+   with the list top, later ones open a gap from the rows above. */
+.statusSection {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  padding-left: 8px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.flatList > * + .statusSection {
+  margin-top: 12px;
+}
+
 .flatList > * + *,
 .searchTree > [role='treeitem'] + [role='treeitem'],
 .groupSection > * + * {

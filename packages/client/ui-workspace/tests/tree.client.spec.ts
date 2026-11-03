@@ -7,9 +7,10 @@ import type {
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionProjectionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
 import {
-  type ArchivedFilter,
+  type ArchivedFilter, type SessionNode,
   deriveFlat, deriveGroups, deriveSearchResults, orderByRecency, owningGroupKey, owningParentFolder,
-  pinCurrentBlank, reconcileManualOrder, sessionMemberIds, visibleSessionIds, workspaceLabel, UNGROUPED_KEY,
+  pinCurrentBlank, reconcileManualOrder, sectionByStatus, sessionMemberIds, visibleSessionIds, workspaceLabel,
+  UNGROUPED_KEY,
 } from '../src/client/tree.ts'
 import { createWorkspaceViewStore } from '../src/client/stores.ts'
 
@@ -580,6 +581,34 @@ describe('deriveFlat', () => {
     expect(rows.map(row => [row.id, row.pinned])).toEqual([
       [sid('b'), true], [sid('a'), true], [sid('c'), true], [sid('d'), false],
     ])
+  })
+})
+
+describe('sectionByStatus', () => {
+  const node = (id: string, patch: Partial<SessionNode> = {}): SessionNode => ({
+    id: sid(id), title: id, blank: false, running: false, runningSubagentCount: 0,
+    completed: false, pinned: false, archived: false, updatedAt: 0, ...patch,
+  })
+
+  it('sections rows by what each Session needs and keeps the flat order inside a section', () => {
+    const sections = sectionByStatus([
+      node('idle'),
+      node('asking', { running: true, pendingInteraction: 'question' }),
+      node('busy', { running: true }),
+      node('delegating', { runningSubagentCount: 1 }),
+      node('archived', { running: true, archived: true }),
+      node('reviewing', { pendingInteraction: 'plan-review' }),
+    ])
+    expect(sections.map(section => [section.key, section.rows.map(row => row.id)])).toEqual([
+      ['running', [sid('busy'), sid('delegating')]],
+      ['attention', [sid('asking'), sid('reviewing')]],
+      ['other', [sid('idle'), sid('archived')]],
+    ])
+  })
+
+  it('omits empty sections', () => {
+    expect(sectionByStatus([node('idle')]).map(section => section.key)).toEqual(['other'])
+    expect(sectionByStatus([])).toEqual([])
   })
 })
 
