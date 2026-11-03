@@ -22,6 +22,7 @@
 | 子会话可不显示权限按钮：`ctx.uiPermission.hideInChildSessions()`；`custom` 权限状态译为「自定义」 | 通用扩展接口 | `packages/client/ui-permission-presets`（`presentation-service.ts`、`PermissionSelect.tsx`、`presentation.ts`、`locales.ts`、`index.ts`、测试、中英 README） | 子代理与团队成员的权限由父会话创建时设定，输入框里仍显示一个对不上预设、且未翻译的「Custom」；新增按调用方 fiber 释放的认领，没有认领时行为不变，`custom` 补上翻译 | 上游提供等价选项或修好翻译后可去掉 |
 | 团队投影带上队员职责描述（`TeamMemberProjection.description`） | 通用扩展接口 | `packages/experimental/agent-team`（`types.ts`、`projection.ts`、测试、中英 README）、`docs/subsystems/agent-team` 中英、持久化目录重新生成（只有行号变化） | 主理生成队员时写的职责描述已持久保存，但不在给浏览器的团队投影里，界面显示不了队员负责什么；只读展示，不进入模型请求 | 上游投影带上描述后可去掉 |
 | 自动化页「新建」可预填草稿：`schedule.manager` 的 `new.draft`（默认空，行为不变），非空时作为新会话输入框的初始文字 | 通用扩展接口 | `packages/client/ui-schedule`（`index.ts`、`task-manager-locales.ts`、测试、中英 README） | 通办用 `locale.overrideTexts` 填「请帮我创建一个自动化任务，」，引导用户直接说要做的事；上游若提供新建草稿的接口即可去掉 |
+| MCP 客户端新增旧版 SSE 传输（`transport: 'sse'`）与编程挂载时的授权提供方 `authProvider`（Streamable HTTP 与 SSE） | 通用扩展接口 | `packages/mcp/mcp-client`（`src/index.ts` 的 `Config` 与 `McpAuthProvider`、`src/transport.ts`、测试 `tests/sse-auth.spec.ts`、中英 README、`docs/config-catalog` 重新生成） | 传输工厂只认 stdio 与 Streamable HTTP，下游接不了仍停留在 HTTP+SSE 的服务器，也没法给请求挂 OAuth 或令牌提供方；都是 MCP SDK 已有的能力，原样透传，YAML 配置不受影响 | 上游提供等价传输与授权接口后可去掉 |
 
 ## 核心仓库如何使用这些改动
 

@@ -303,13 +303,19 @@ export interface Config {
 ## `@deepseek-ai/dsh-api-workspace-controller`
 
 - `inject`: `remoteAccess` · `typert` · `workspaceRegistry`
-- `source`: [`packages/api/workspace-controller/src/index.ts:37`](../packages/api/workspace-controller/src/index.ts)
+- `source`: [`packages/api/workspace-controller/src/index.ts:39`](../packages/api/workspace-controller/src/index.ts)
 
 ```ts config-catalog
 /** First-use directory policy for the Host account. */
 export interface Config {
   /** Override the system Documents directory with a fully qualified path. */
   documentsDirectory?: string
+  /**
+   * Fully qualified directory that holds the first-use Workspace in place of
+   * `<Documents>/deepseek-harness`; no Documents lookup runs. Exclusive with
+   * `documentsDirectory`.
+   */
+  defaultWorkspaceRoot?: string
   /** Maximum duration of the operating system's Documents lookup. */
   documentsLookupTimeoutMs?: number
 }
@@ -843,7 +849,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-agent-team`
 
 - `inject`: `agents` · `sessions` · `sessionPersistence` · `sessionProjections` · `subagents`
-- `source`: [`packages/experimental/agent-team/src/types.ts:153`](../packages/experimental/agent-team/src/types.ts)
+- `source`: [`packages/experimental/agent-team/src/types.ts:155`](../packages/experimental/agent-team/src/types.ts)
 
 ```ts config-catalog
 /** Team-service deployment limits. */
@@ -2181,11 +2187,12 @@ export interface LspLocalServerConfig {
 ## `@deepseek-ai/dsh-mcp-client`
 
 - `inject`: `tools`
-- `source`: [`packages/mcp/mcp-client/src/index.ts:104`](../packages/mcp/mcp-client/src/index.ts)
+- `refs`: `AuthProvider` (`@modelcontextprotocol/client`) · `OAuthClientProvider` (`@modelcontextprotocol/client`)
+- `source`: [`packages/mcp/mcp-client/src/index.ts:144`](../packages/mcp/mcp-client/src/index.ts)
 
 ```ts config-catalog
-/** Configuration for one stdio or Streamable HTTP MCP server. */
-export type Config = StdioConfig | StreamableHttpConfig
+/** Configuration for one stdio, Streamable HTTP or legacy SSE MCP server. */
+export type Config = StdioConfig | StreamableHttpConfig | SseConfig
 
 /** Config for connecting to an MCP server via a spawned child process over stdio. */
 export interface StdioConfig {
@@ -2237,6 +2244,38 @@ export interface StreamableHttpConfig {
   maxInstructionBytes?: number
   /** Automatic reconnect policy after a lost connection; omission uses the defaults. */
   reconnect?: ReconnectConfig
+  /** Request authorization; programmatic callers only (see {@link McpAuthProvider}). */
+  authProvider?: McpAuthProvider
+}
+
+/**
+ * Config for connecting to an MCP server over the legacy HTTP+SSE transport
+ * (protocol 2024-11-05). Prefer Streamable HTTP; use this only for servers
+ * that have not migrated.
+ */
+export interface SseConfig {
+  /** Selects the legacy HTTP+SSE transport. */
+  transport: 'sse'
+  /**
+   * Stable local namespace for this server's model-facing tool names
+   * (`mcp__<serverName>__<rawName>`). Must match `[A-Za-z0-9_-]{1,32}` and be
+   * unique across live mcp-client instances.
+   */
+  serverName: string
+  /** SSE endpoint URL (the GET stream; the server announces its POST endpoint). */
+  url: string
+  /** Additional headers attached to the stream and every POST. */
+  headers: Record<string, string>
+  /** Timeout per tool call or resource request in milliseconds. */
+  toolCallTimeoutMs: number
+  /** Fail plugin activation when the initial connection or tool synchronization fails. */
+  failOnStartupError: boolean
+  /** Maximum UTF-8 bytes of attributed server instructions (default 32768). */
+  maxInstructionBytes?: number
+  /** Automatic reconnect policy after a lost connection; omission uses the defaults. */
+  reconnect?: ReconnectConfig
+  /** Request authorization; programmatic callers only (see {@link McpAuthProvider}). */
+  authProvider?: McpAuthProvider
 }
 
 /** Automatic reconnect policy for one MCP server connection. */
@@ -2250,6 +2289,13 @@ export interface ReconnectConfig {
   /** Consecutive failed attempts per outage before giving up for good (default 10). */
   maxAttempts?: number
 }
+
+/**
+ * Request authorization for HTTP-based transports: a bearer-token source or a
+ * full OAuth client the SDK drives (discovery, registration, refresh). Only a
+ * programmatic caller can supply one — `cordis.yml` cannot express functions.
+ */
+export type McpAuthProvider = AuthProvider | OAuthClientProvider
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-mcp-client -->
 

@@ -14,6 +14,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type { AuthProvider, OAuthClientProvider } from '@modelcontextprotocol/client'
 import z from '@deepseek-ai/schemastery'
 import { scopeOf } from '@deepseek-ai/dsh-scope'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
@@ -26,6 +27,13 @@ import type {} from '@deepseek-ai/dsh-tools'
 export { createMcpToolDefinition } from './tools.ts'
 export type { McpResult, McpToolDefinitionOptions } from './tools.ts'
 export type { ReconnectConfig, ResolvedReconnectPolicy } from './connection.ts'
+
+/**
+ * Request authorization for HTTP-based transports: a bearer-token source or a
+ * full OAuth client the SDK drives (discovery, registration, refresh). Only a
+ * programmatic caller can supply one — `cordis.yml` cannot express functions.
+ */
+export type McpAuthProvider = AuthProvider | OAuthClientProvider
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'mcp-client'
@@ -98,16 +106,50 @@ export interface StreamableHttpConfig {
   maxInstructionBytes?: number
   /** Automatic reconnect policy after a lost connection; omission uses the defaults. */
   reconnect?: ReconnectConfig
+  /** Request authorization; programmatic callers only (see {@link McpAuthProvider}). */
+  authProvider?: McpAuthProvider
 }
 
-/** Configuration for one stdio or Streamable HTTP MCP server. */
-export type Config = StdioConfig | StreamableHttpConfig
+/**
+ * Config for connecting to an MCP server over the legacy HTTP+SSE transport
+ * (protocol 2024-11-05). Prefer Streamable HTTP; use this only for servers
+ * that have not migrated.
+ */
+export interface SseConfig {
+  /** Selects the legacy HTTP+SSE transport. */
+  transport: 'sse'
+  /**
+   * Stable local namespace for this server's model-facing tool names
+   * (`mcp__<serverName>__<rawName>`). Must match `[A-Za-z0-9_-]{1,32}` and be
+   * unique across live mcp-client instances.
+   */
+  serverName: string
+  /** SSE endpoint URL (the GET stream; the server announces its POST endpoint). */
+  url: string
+  /** Additional headers attached to the stream and every POST. */
+  headers: Record<string, string>
+  /** Timeout per tool call or resource request in milliseconds. */
+  toolCallTimeoutMs: number
+  /** Fail plugin activation when the initial connection or tool synchronization fails. */
+  failOnStartupError: boolean
+  /** Maximum UTF-8 bytes of attributed server instructions (default 32768). */
+  maxInstructionBytes?: number
+  /** Automatic reconnect policy after a lost connection; omission uses the defaults. */
+  reconnect?: ReconnectConfig
+  /** Request authorization; programmatic callers only (see {@link McpAuthProvider}). */
+  authProvider?: McpAuthProvider
+}
+
+/** Configuration for one stdio, Streamable HTTP or legacy SSE MCP server. */
+export type Config = StdioConfig | StreamableHttpConfig | SseConfig
 
 type StdioConfigInput = Omit<StdioConfig, 'args' | 'env' | 'cwd' | 'toolCallTimeoutMs' | 'failOnStartupError'>
   & Partial<Pick<StdioConfig, 'args' | 'env' | 'cwd' | 'toolCallTimeoutMs' | 'failOnStartupError'>>
 type StreamableHttpConfigInput = Omit<StreamableHttpConfig, 'headers' | 'toolCallTimeoutMs' | 'failOnStartupError'>
   & Partial<Pick<StreamableHttpConfig, 'headers' | 'toolCallTimeoutMs' | 'failOnStartupError'>>
-type ConfigInput = StdioConfigInput | StreamableHttpConfigInput
+type SseConfigInput = Omit<SseConfig, 'headers' | 'toolCallTimeoutMs' | 'failOnStartupError'>
+  & Partial<Pick<SseConfig, 'headers' | 'toolCallTimeoutMs' | 'failOnStartupError'>>
+type ConfigInput = StdioConfigInput | StreamableHttpConfigInput | SseConfigInput
 
 const Reconnect: z<ReconnectConfig> = z.object({
   enabled: z.boolean().default(RECONNECT_DEFAULTS.enabled),
@@ -138,6 +180,20 @@ export const Config = z.union([
     failOnStartupError: z.boolean().default(false),
     maxInstructionBytes: z.number().step(1).min(1).default(DEFAULT_MAX_INSTRUCTION_BYTES),
     reconnect: Reconnect,
+    // Kept by identity; the SDK checks the provider when it calls it. Programmatic callers only.
+    authProvider: z.is(Object).hidden(),
+  }),
+  z.object({
+    transport: z.const('sse'),
+    serverName: z.string().required().pattern(SERVER_NAME_PATTERN),
+    url: z.string().required(),
+    headers: z.dict(String).default({}),
+    toolCallTimeoutMs: z.number().default(DEFAULT_TOOL_CALL_TIMEOUT_MS),
+    failOnStartupError: z.boolean().default(false),
+    maxInstructionBytes: z.number().step(1).min(1).default(DEFAULT_MAX_INSTRUCTION_BYTES),
+    reconnect: Reconnect,
+    // Kept by identity; the SDK checks the provider when it calls it. Programmatic callers only.
+    authProvider: z.is(Object).hidden(),
   }),
 ]) as z<ConfigInput, Config>
 
