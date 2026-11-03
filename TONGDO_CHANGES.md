@@ -21,6 +21,7 @@
 | 设置分区的导航图标扩展位 `settings.section.icon` | 通用扩展接口 | `packages/client/ui-settings`（`contract/slots.ts`、中英 README）、`packages/client/ui-settings-general`（`SettingsRoot.tsx`、`index.ts`、`shell-contract.ts`、测试、中英 README） | 设置导航的图标按分区 id 写死在外壳里，其余分区一律是齿轮，下游给自己的分区配不了图标；新增 keyed 扩展位，没有条目时用原图形 | 上游提供等价扩展位后可去掉 |
 | 子会话可不显示权限按钮：`ctx.uiPermission.hideInChildSessions()`；`custom` 权限状态译为「自定义」 | 通用扩展接口 | `packages/client/ui-permission-presets`（`presentation-service.ts`、`PermissionSelect.tsx`、`presentation.ts`、`locales.ts`、`index.ts`、测试、中英 README） | 子代理与团队成员的权限由父会话创建时设定，输入框里仍显示一个对不上预设、且未翻译的「Custom」；新增按调用方 fiber 释放的认领，没有认领时行为不变，`custom` 补上翻译 | 上游提供等价选项或修好翻译后可去掉 |
 | 团队投影带上队员职责描述（`TeamMemberProjection.description`） | 通用扩展接口 | `packages/experimental/agent-team`（`types.ts`、`projection.ts`、测试、中英 README）、`docs/subsystems/agent-team` 中英、持久化目录重新生成（只有行号变化） | 主理生成队员时写的职责描述已持久保存，但不在给浏览器的团队投影里，界面显示不了队员负责什么；只读展示，不进入模型请求 | 上游投影带上描述后可去掉 |
+| 自动化页「新建」可预填草稿：`schedule.manager` 的 `new.draft`（默认空，行为不变），非空时作为新会话输入框的初始文字 | 通用扩展接口 | `packages/client/ui-schedule`（`index.ts`、`task-manager-locales.ts`、测试、中英 README） | 通办用 `locale.overrideTexts` 填「请帮我创建一个自动化任务，」，引导用户直接说要做的事；上游若提供新建草稿的接口即可去掉 |
 
 ## 核心仓库如何使用这些改动
 

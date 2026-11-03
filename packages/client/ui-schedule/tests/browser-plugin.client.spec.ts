@@ -333,7 +333,12 @@ describe('ui-schedule browser half', () => {
       // The panel starts a new reminder in a Session rather than opening a creation form.
       const panel = injectedFace(ctx.slots.entries('main')[0]!, undefined as never) as TaskManagerInjected
       panel.onNewTask()
-      expect(startSession).toHaveBeenCalledOnce()
+      expect(startSession).toHaveBeenCalledWith(undefined, undefined)
+      // A deployment-provided `new.draft` prefills the new Session's composer.
+      const restore = ctx.locale.overrideTexts('test', { 'schedule.manager': { en: { 'new.draft': 'Create an automation: ' }, zh: { 'new.draft': 'Create an automation: ' } } })
+      panel.onNewTask()
+      expect(startSession).toHaveBeenLastCalledWith(undefined, { prompt: 'Create an automation: ', whenDraftExists: 'replace' })
+      restore()
     } finally {
       await fiber.dispose()
       owner()

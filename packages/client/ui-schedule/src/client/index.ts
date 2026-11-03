@@ -171,8 +171,11 @@ export function apply(ctx: ClientContext): void {
     locale: MANAGER_NS,
     inject: (): TaskManagerInjected => ({
       ...detail,
-      // The page has no creation form: a new reminder starts in a Session.
-      onNewTask: () => { ctx.uiWorkspace.startSession() },
+      // The page has no creation form: a new reminder starts in a Session, prefilled with `new.draft` when the deployment sets one.
+      onNewTask: () => {
+        const draft = t('new.draft')
+        ctx.uiWorkspace.startSession(undefined, draft === '' ? undefined : { prompt: draft, whenDraftExists: 'replace' })
+      },
     }),
   }, TaskManagerPage))
   ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({

@@ -6,6 +6,8 @@ export const en = {
   'panel': 'Automation tasks',
   'title': 'Automation tasks',
   'new.action': 'New',
+  // Draft prefilled into the Session that New opens; empty keeps the composer empty. Deployments set it through `locale.overrideTexts`.
+  'new.draft': '',
   'list.label': 'Task catalog',
   'list.nextPrefix': 'Next scheduled time: ',
   'list.loading': 'Loading tasks…',
@@ -150,6 +152,7 @@ export const zh: Record<TaskManagerKey, string> = {
   'panel': '自动化任务',
   'title': '自动化任务',
   'new.action': '新建',
+  'new.draft': '',
   'list.label': '任务列表',
   'list.nextPrefix': '下次计划时间：',
   'list.loading': '正在加载任务…',
