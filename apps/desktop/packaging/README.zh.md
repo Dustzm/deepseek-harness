@@ -19,6 +19,7 @@ description: "在本地或 Windows／macOS Actions 中生成 Desktop 安装包�
 - [macOS 自托管打包](#macos-actions)
 - [未签名 Windows 测试安装包](#unsigned-windows-test-installer)
 - [无发布签名的本地 macOS DMG](#local-macos-dmg-without-release-signing)
+- [发行配置打包](#distribution-packaging)
 - [macOS 发布签名与诊断](#macos-release-signing)
 - [目录构建与准备](#directory-and-preparation)
 - [用回环 registry 安装本地 Official 包](#local-official-bundles-from-a-loopback-registry)
@@ -162,6 +163,28 @@ pnpm run package:desktop:mac:x64:unsigned
 添加 `--check` 仅验证本地配置和工具而不构建，或添加 `--dir` 只生成解包应用。DMG 路径为 `apps/desktop/.desktop-build/targets/<target>/unsigned-artifacts/deepseek-harness-<version>-mac-<arch>-unsigned.dmg`。所有检查通过后，命令打印 `DMG:` 及其绝对路径。打开后将应用复制到本地测试目录。
 
 这些命令忽略 `.env.macos` 和继承的发布配置，使用 `com.deepseek.harness` 作为应用 ID，并省略自动更新和强制更新配置。构建工具、标准网络代理与 `DSH_DESKTOP_NPM_REGISTRY` 仍可从 shell 提供。它们跳过 Developer ID 签名、Apple 公证、临时签名钥匙串和公证代理修改。Electron 使用无需证书的本地 ad-hoc 签名，以便修改后的可执行文件能够运行；DMG 不签名。准备阶段和组装后的应用仍执行运行时完整性与冒烟检查。本地构建不生成更新源、ZIP 或发布完成记录，上传命令无法发布这些产物。macOS 可能要求在“系统设置 → 隐私与安全性”中批准打开未经公证的应用。
+
+<a id="distribution-packaging"></a>
+
+## 发行配置打包
+
+未签名打包命令接受 `--distribution <绝对目录>`（或环境变量 `DSH_DESKTOP_DISTRIBUTION`），把 Desktop 打成另一个产品。目录中的 `distribution.json` 声明以下内容，文件路径相对该目录：
+
+| 字段 | 作用 |
+|---|---|
+| `product` | 名称、产物文件名、应用 ID、产品版本、深链协议、默认数据目录名（`DSH_HOME` 未设置时为 `~/<homeDirName>`） |
+| `icons` | macOS 与 Windows 应用图标，可选 DMG 背景 |
+| `client` | 写进 Web 客户端构建的 `DSH_CLIENT_*` 产品标识，至少包含 `DSH_CLIENT_TITLE` |
+| `packages` | 额外的包 tarball 目录；其中每个包都作为包集合的根随应用打包 |
+| `profile.bundles` | 新 Desktop profile 的 bundle 列表，同时是原生恢复保留的列表 |
+| `signIn` | 欢迎页是否提供 DeepSeek 账号登录；为 `false` 时只提供 API Key，主进程也不连接账号服务 |
+| `welcome` | 可选的欢迎页目录，其中的 `index.html` 替换自带欢迎页；页面经同一个隔离 preload 使用 `window.dshWelcome`（语言、`signIn`、`saveApiKey`、`skip` 等），受页面自身的 CSP 约束 |
+
+加载时校验每个字段，缺失或无效时打包立即失败。发行配置打包以 `distribution` 客户端构建档构建仓库：官方构建值加上 `client` 中的产品标识，`DSH_CLIENT_BUILD_PROFILE` 为 `distribution`，release 打包按同一组值校验构建记录。应用显示产品版本，内置 dsh 运行时保留仓库版本。目前只支持未签名构建，产物不含自动更新与强制更新配置。
+
+```sh
+pnpm --dir apps/desktop run package:mac:arm64:unsigned --distribution /abs/path/to/distribution
+```
 
 <a id="macos-release-signing"></a>
 

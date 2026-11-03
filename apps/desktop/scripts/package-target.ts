@@ -24,6 +24,9 @@ import { suggestDesktopBuildVersion } from './desktop-build-version-discovery.ts
 import { desktopBuildCommitEnvironment, readDesktopBuildCommit, resolveDesktopBuildCommit } from './desktop-build-commit.mjs'
 import { requireDesktopToolchain } from './desktop-toolchain-preflight.ts'
 import { withMacOSNotarizationProxy } from './macos-notarization-proxy.ts'
+import { DESKTOP_DISTRIBUTION_ENV, resolveDesktopDistribution, type DesktopDistribution } from './desktop-distribution.mjs'
+import { CLIENT_BUILD_IDENTITY_SELECTOR } from '../../../scripts/client-build-environment.ts'
+import { pnpmInvocation } from '../../../scripts/executable-packaging.ts'
 
 const APP_ROOT = resolve(import.meta.dirname, '..')
 const REPOSITORY_ROOT = resolve(APP_ROOT, '..', '..')
@@ -201,6 +204,8 @@ interface DesktopPackageInvocation {
   readonly check: boolean
   /** Build identifier to publish under, when this build does not publish the product version. */
   readonly requestedBuildVersion: string | undefined
+  /** Absolute distribution directory that repackages Desktop under another product. */
+  readonly distribution: string | undefined
 }
 
 function hostTargetName(platform: NodeJS.Platform, arch: string): DesktopPackageTargetName {
@@ -233,6 +238,7 @@ export function parseDesktopPackageInvocation(
       'skip-notarization': { type: 'boolean', default: false },
       check: { type: 'boolean', default: false },
       'build-version': { type: 'string' },
+      distribution: { type: 'string' },
     },
   })
   if (positionals.length > 1) throw new Error('desktop package: expected at most one target')
@@ -253,6 +259,7 @@ export function parseDesktopPackageInvocation(
     skipNotarization: values['skip-notarization'],
     check: values.check,
     requestedBuildVersion,
+    distribution: values.distribution === undefined ? undefined : resolve(values.distribution),
   }
 }
 
@@ -297,9 +304,11 @@ function runPnpm(
   if (pnpmEntry === undefined || pnpmEntry === '') {
     throw new Error('desktop package: invoke this script through a pnpm package command')
   }
-  if (run !== undefined) return run.run(args.join(' '), process.execPath, [pnpmEntry, ...args], { cwd, env })
+  // npm_execpath is pnpm's JavaScript entry, or its executable when pnpm is installed as a standalone binary.
+  const [command, commandArgs] = pnpmInvocation([...args])
+  if (run !== undefined) return run.run(args.join(' '), command, commandArgs, { cwd, env })
   return new Promise((resolvePromise, reject) => {
-    const child = spawn(process.execPath, [pnpmEntry, ...args], {
+    const child = spawn(command, commandArgs, {
       cwd,
       env,
       stdio: 'inherit',
@@ -348,7 +357,13 @@ async function main(): Promise<void> {
     : loadDesktopPackageEnvironment(target.platform, process.env, APP_ROOT, {
       unsigned: invocation.unsigned, prepareOnly: invocation.prepareOnly,
     })
-  const productVersion = packageVersion(join(APP_ROOT, 'package.json'), 'desktop package')
+  if (invocation.distribution !== undefined) environment[DESKTOP_DISTRIBUTION_ENV] = invocation.distribution
+  const distribution = resolveDesktopDistribution(environment)
+  if (distribution !== undefined && !invocation.unsigned) {
+    // Signing, notarization and update feeds are bound to the DeepSeek Harness release configuration.
+    throw new Error('desktop package: a distribution currently packages only unsigned builds; pass --unsigned')
+  }
+  const productVersion = distribution?.product.version ?? packageVersion(join(APP_ROOT, 'package.json'), 'desktop package')
   // Release settings come from the selected configuration files, so the version this run publishes is an
   // argument; the environment variable below only carries it to the child processes that build.
   const buildVersion = await resolveRequestedBuildVersion(invocation, productVersion, environment)
@@ -401,9 +416,23 @@ async function main(): Promise<void> {
   if (success && target.platform === 'darwin' && !invocation.directory && !invocation.prepareOnly) {
     const paths = desktopTargetBuildPaths(target.name)
     const output = desktopArtifactOutput(paths, invocation)
-    const filename = `deepseek-harness-${buildVersion}-mac-${target.arch}${output.suffix}.dmg`
+    const filename = `${distribution?.product.fileName ?? 'deepseek-harness'}-${buildVersion}-mac-${target.arch}${output.suffix}.dmg`
     console.log(`DMG: ${join(output.directory, filename)}`)
   }
+}
+
+/**
+ * Select the distribution's client identity for the repository build and release packing.
+ * @param environment - Build environment.
+ * @param distribution - Selected distribution, if any.
+ * @returns The environment, carrying the distribution identity when one is selected.
+ */
+export function distributionBuildEnvironment(
+  environment: NodeJS.ProcessEnv,
+  distribution: DesktopDistribution | undefined,
+): NodeJS.ProcessEnv {
+  if (distribution === undefined) return environment
+  return { ...environment, [CLIENT_BUILD_IDENTITY_SELECTOR]: JSON.stringify(distribution.client) }
 }
 
 /**
@@ -473,8 +502,10 @@ export async function packageTarget(
         { cwd: APP_ROOT, env: electronBuilderEnv, timeoutMs: 60_000 })
     })
   }
-  await execute(['run', 'build:official'], buildEnv, REPOSITORY_ROOT)
-  await execute(['run', 'release:pack', '--family', 'dsh', '--out', buildPaths.packedDsh, ...packArguments], buildEnv, REPOSITORY_ROOT)
+  const distribution = resolveDesktopDistribution(environment)
+  const releaseBuildEnv = distributionBuildEnvironment(buildEnv, distribution)
+  await execute(['run', distribution === undefined ? 'build:official' : 'build:distribution'], releaseBuildEnv, REPOSITORY_ROOT)
+  await execute(['run', 'release:pack', '--family', 'dsh', '--out', buildPaths.packedDsh, ...packArguments], releaseBuildEnv, REPOSITORY_ROOT)
   await execute([
     '--dir',
     'apps/desktop-host',

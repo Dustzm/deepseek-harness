@@ -5,11 +5,14 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { resolveDesktopLocale } from './locale.ts'
 import { WELCOME_IPC, type WelcomeApi, type WelcomeNotice, type WelcomeSaveResult } from './welcome-api.ts'
 
-const prefix = '--dsh-welcome-locale='
-const locale = process.argv.find(argument => argument.startsWith(prefix))?.slice(prefix.length)
+const argument = (prefix: string): string | undefined =>
+  process.argv.find(value => value.startsWith(prefix))?.slice(prefix.length)
+const locale = argument('--dsh-welcome-locale=')
 if (locale === undefined) throw new Error('desktop welcome: missing window locale')
+const product = argument('--dsh-welcome-product=')
 const api: WelcomeApi = {
-  ...resolveDesktopLocale(locale),
+  ...resolveDesktopLocale(locale, product === undefined ? undefined : decodeURIComponent(product)),
+  signIn: argument('--dsh-welcome-sign-in=') !== '0',
   analytics: async (eventName, attributes) => {
     if (await api.analyticsEnabled()) await ipcRenderer.invoke(WELCOME_IPC.analytics, eventName, attributes)
   },

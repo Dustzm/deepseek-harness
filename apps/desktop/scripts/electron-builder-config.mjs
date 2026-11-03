@@ -22,6 +22,10 @@ import {
 import { resolveDesktopAutoUpdateConfig } from './desktop-auto-update-environment.mjs'
 import { resolveDesktopBuildCommit } from './desktop-build-commit.mjs'
 import { resolveDesktopBuildVersion } from './desktop-build-version.mjs'
+import { DESKTOP_DISTRIBUTION_MANIFEST_FIELD, desktopDistributionMetadata, resolveDesktopDistribution } from './desktop-distribution.mjs'
+
+/** Application-relative directory of a distribution's welcome page; `welcome-window.ts` loads its `index.html`. */
+const DISTRIBUTION_WELCOME_DIRECTORY = 'renderer/distribution-welcome'
 import { resolveDesktopPolicyEnvironment } from './desktop-policy-environment.mjs'
 import { desktopArtifactOutput, desktopTargetBuildPaths, resolveDesktopBuildTarget } from './desktop-build-paths.mjs'
 import { installWindowsDirectoryInstaller } from './windows-directory-installer.mjs'
@@ -50,7 +54,9 @@ export function createElectronBuilderConfig(
   preparedRuntime = undefined,
   preparedRuntimeVersion = undefined,
 ) {
-  const appId = resolveDesktopAppId(env)
+  const distribution = resolveDesktopDistribution(env)
+  const appId = distribution?.product.appId ?? resolveDesktopAppId(env)
+  const productName = distribution?.product.name ?? 'DeepSeek Harness'
   const targetPlatform = env.DSH_DESKTOP_TARGET_PLATFORM
   const resolvedPlatform = targetPlatform ?? hostPlatform
   const resolvedArch = env.DSH_DESKTOP_TARGET_ARCH ?? hostArch
@@ -99,23 +105,31 @@ export function createElectronBuilderConfig(
   if (preparedRuntime !== undefined) buildPaths.dsh = preparedRuntime
   // electron-builder merges extraMetadata into the packaged manifest, so a build version here reaches
   // the artifact names, the update feed, and the installed app.getVersion() the updater compares against.
-  const productVersion = JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8')).version
+  // The bundled dsh runtime keeps the repository version; a distribution publishes its own product version.
+  const runtimeVersion = JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8')).version
+  const productVersion = distribution?.product.version ?? runtimeVersion
   const buildVersion = resolveDesktopBuildVersion(env, productVersion)
   if (update?.channel === 'latest' && buildVersion.includes('-')) throw new Error('desktop package: latest requires a stable version')
   const packaged = resolveDesktopBuildCommit(env)
   return {
     appId,
-    protocols: [{ name: 'DeepSeek Harness', schemes: ['dsh'] }],
+    protocols: [{ name: productName, schemes: [distribution?.product.protocol ?? 'dsh'] }],
     extraMetadata: {
       dshDesktopAppId: appId,
       dshDesktopUpdateChannel: update?.channel ?? 'nightly',
       ...(policy === undefined ? {} : { dshMandatoryUpdatePolicy: policy }),
-      ...buildVersion === productVersion ? {} : { version: buildVersion },
+      ...buildVersion === runtimeVersion ? {} : { version: buildVersion },
+      // app.name follows the manifest name and names userData and the single-instance lock, so a distribution
+      // takes its own name and never shares them with an installed DeepSeek Harness.
+      ...distribution === undefined ? {} : {
+        name: distribution.product.fileName,
+        [DESKTOP_DISTRIBUTION_MANIFEST_FIELD]: desktopDistributionMetadata(distribution),
+      },
       ...packaged === undefined ? {} : { dshBuildCommit: packaged.commit, dshBuildDirty: packaged.dirty },
     },
-    productName: 'DeepSeek Harness',
+    productName,
     // Unsigned builds carry their own suffix so a shared file can never pass for a release artifact.
-    artifactName: `deepseek-harness-\${version}-\${os}-\${arch}${output.suffix}.\${ext}`,
+    artifactName: `${distribution?.product.fileName ?? 'deepseek-harness'}-\${version}-\${os}-\${arch}${output.suffix}.\${ext}`,
     directories: { output: output.directory },
     asar: true,
     electronDist: buildPaths.electron,
@@ -148,16 +162,17 @@ export function createElectronBuilderConfig(
       { from: buildPaths.dsh, to: 'dsh', filter: ['**/*'] },
       // electron-builder excludes a source directory's root node_modules.
       { from: join(buildPaths.dsh, 'node_modules'), to: 'dsh/node_modules', filter: ['**/*'] },
+      ...distribution?.welcome === undefined ? [] : [{ from: distribution.welcome, to: DISTRIBUTION_WELCOME_DIRECTORY, filter: ['**/*'] }],
     ],
     asarUnpack: unpack,
     extraResources: [
       { from: buildPaths.runtime, to: 'runtime' },
-      { from: fileURLToPath(new URL('../resources/icon-windows.png', import.meta.url)), to: 'icon.png' },
+      { from: distribution?.icons.windows ?? fileURLToPath(new URL('../resources/icon-windows.png', import.meta.url)), to: 'icon.png' },
       // Windows tray bitmaps; macOS keeps the Dock and ships no menu bar icon.
       ...(packagesWindows ? [{ from: fileURLToPath(new URL('../resources/tray-windows.ico', import.meta.url)), to: 'tray.ico' }] : []),
     ],
     mac: {
-      icon: fileURLToPath(new URL('../resources/icon-macos.png', import.meta.url)),
+      icon: distribution?.icons.macos ?? fileURLToPath(new URL('../resources/icon-macos.png', import.meta.url)),
       category: 'public.app-category.developer-tools',
       // macOS matches the application locale against this bundle, not Electron Framework resources.
       extendInfo: { CFBundleLocalizations: ['en', 'zh_CN'] },
@@ -165,7 +180,7 @@ export function createElectronBuilderConfig(
       identity: unsigned ? '-' : macOSSigning?.signingIdentity,
       forceCodeSigning: !unsigned,
       hardenedRuntime: true,
-      extendInfo: { NSMicrophoneUsageDescription: 'DeepSeek Harness uses your microphone to transcribe speech into message drafts.' },
+      extendInfo: { NSMicrophoneUsageDescription: `${productName} uses your microphone to transcribe speech into message drafts.` },
       entitlements: fileURLToPath(new URL('./macos-entitlements.plist', import.meta.url)),
       entitlementsInherit: fileURLToPath(new URL('./macos-entitlements.plist', import.meta.url)),
       // Prepared runtime files retain their signatures; PAK resources are sealed by their enclosing bundle.
@@ -174,6 +189,7 @@ export function createElectronBuilderConfig(
       target: unsigned ? ['dmg'] : ['dmg', 'zip'],
     },
     dmg: {
+      ...distribution?.icons.dmgBackground === undefined ? {} : { background: distribution.icons.dmgBackground },
       format: 'ULMO',
       sign: !unsigned,
       writeUpdateInfo: false,
@@ -202,7 +218,7 @@ export function createElectronBuilderConfig(
       // The bundled runtime declares whichever version prepared it: the product version for an ordinary
       // release, and a rewritten one for installed-update qualification.
       await verifyDesktopRuntime(buildPaths.dsh,
-        preparedRuntimeVersion ?? productVersion, { platform: resolvedPlatform, arch: resolvedArch })
+        preparedRuntimeVersion ?? runtimeVersion, { platform: resolvedPlatform, arch: resolvedArch })
       // Unsigned Windows builds skip electron-builder's afterSign hook.
       if (packagesWindows && unsigned) await verifyWindowsAsarUnpack(buildPaths.dsh, resourcesDir, windowsCode)
     },
@@ -236,7 +252,7 @@ export function createElectronBuilderConfig(
       )
     },
     win: {
-      icon: fileURLToPath(new URL('../resources/icon-windows.png', import.meta.url)),
+      icon: distribution?.icons.windows ?? fileURLToPath(new URL('../resources/icon-windows.png', import.meta.url)),
       forceCodeSigning: !unsigned,
       signtoolOptions: {
         sign: windowsSigner,

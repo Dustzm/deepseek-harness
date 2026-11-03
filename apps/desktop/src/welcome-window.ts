@@ -5,15 +5,20 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, ipcMain, type BrowserWindowConstructorOptions, type IpcMainInvokeEvent } from 'electron'
 import type { DesktopLocale } from './locale.ts'
-import { WELCOME_IPC, type WelcomeOperations } from './welcome-api.ts'
+import { WELCOME_IPC, type WelcomeOperations, type WelcomePresentation } from './welcome-api.ts'
 
 /**
  * Resolve the fixed-size welcome window's native material and controls.
  * @param platform - operating system hosting Electron.
  * @param locale - shell-owned localized copy.
+ * @param presentation - product name and offered sign-in methods passed to the preload.
  * @returns sandboxed window options with a locale-only preload.
  */
-export function welcomeWindowOptions(platform: NodeJS.Platform, locale: DesktopLocale): BrowserWindowConstructorOptions {
+export function welcomeWindowOptions(
+  platform: NodeJS.Platform,
+  locale: DesktopLocale,
+  presentation: WelcomePresentation = { signIn: true },
+): BrowserWindowConstructorOptions {
   return {
     width: 600,
     height: 700,
@@ -38,7 +43,11 @@ export function welcomeWindowOptions(platform: NodeJS.Platform, locale: DesktopL
     } as const : {}),
     webPreferences: {
       preload: fileURLToPath(new URL('./preload-welcome.cjs', import.meta.url)),
-      additionalArguments: [`--dsh-welcome-locale=${locale.id}`],
+      additionalArguments: [
+        `--dsh-welcome-locale=${locale.id}`,
+        `--dsh-welcome-sign-in=${presentation.signIn ? '1' : '0'}`,
+        ...presentation.productName === undefined ? [] : [`--dsh-welcome-product=${encodeURIComponent(presentation.productName)}`],
+      ],
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
@@ -56,8 +65,12 @@ let disposeActiveHandlers: (() => void) | undefined
  * @param operations - credential write and this-launch-only skip actions.
  * @returns the visible window; a failed load destroys it before rejecting.
  */
-export async function openWelcomeWindow(locale: DesktopLocale, operations: WelcomeOperations): Promise<BrowserWindow> {
-  const options = welcomeWindowOptions(process.platform, locale)
+export async function openWelcomeWindow(
+  locale: DesktopLocale,
+  operations: WelcomeOperations,
+  presentation: WelcomePresentation = { signIn: true },
+): Promise<BrowserWindow> {
+  const options = welcomeWindowOptions(process.platform, locale, presentation)
   const window = new BrowserWindow(options)
   disposeActiveHandlers?.()
   let active = true
@@ -117,7 +130,9 @@ export async function openWelcomeWindow(locale: DesktopLocale, operations: Welco
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   window.webContents.on('will-navigate', (event) => { event.preventDefault() })
   try {
-    await window.loadFile(join(app.getAppPath(), 'renderer', 'welcome.html'))
+    await window.loadFile(presentation.distributionPage === true
+      ? join(app.getAppPath(), 'renderer', 'distribution-welcome', 'index.html')
+      : join(app.getAppPath(), 'renderer', 'welcome.html'))
   } catch (error) {
     disposeHandlers()
     if (!window.isDestroyed()) window.destroy()

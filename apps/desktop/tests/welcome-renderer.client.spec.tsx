@@ -11,7 +11,7 @@ import type { WelcomeSaveResult, WelcomeNotice } from '../src/welcome-api.ts'
 const html = readFileSync(join(import.meta.dirname, '../renderer/welcome.html'), 'utf8')
 afterEach(cleanup)
 
-function mount(language = 'zh-CN', takeNotice = vi.fn<() => Promise<WelcomeNotice | undefined>>().mockResolvedValue(undefined)) {
+function mount(language = 'zh-CN', takeNotice = vi.fn<() => Promise<WelcomeNotice | undefined>>().mockResolvedValue(undefined), signIn = true) {
   cleanup()
   const stopAccount = vi.fn()
   const api = {
@@ -23,6 +23,7 @@ function mount(language = 'zh-CN', takeNotice = vi.fn<() => Promise<WelcomeNotic
     cancelSignIn: vi.fn(async (): Promise<AccountView> => ({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up' }, status: 'signed-out', attempt: null })),
     copySignInLink: vi.fn(async () => undefined),
     ...resolveDesktopLocale(language),
+    signIn,
     saveApiKey: vi.fn<(value: string) => Promise<WelcomeSaveResult>>().mockResolvedValue({ ok: true }),
     skip: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
   }
@@ -57,6 +58,12 @@ describe('desktop welcome presentation', () => {
     expect(view.document.activeElement).toBe(view.input)
     expect(view.input.type).toBe('password')
     await expect(view.copy()).toMatchFileSnapshot(`./expected/welcome/${language}-api-key.expected.txt`)
+  })
+
+  it('offers only the API key as the primary entry when account sign-in is unavailable', () => {
+    const view = mount('zh-CN', undefined, false)
+    expect(view.document.querySelector('#sign-in')).toBeNull()
+    expect(view.button('#api-key').className).toBe('primary')
   })
 
   it('sends one trimmed key, prevents competing actions, and clears it after saving', async () => {

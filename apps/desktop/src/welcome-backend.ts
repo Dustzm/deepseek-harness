@@ -16,7 +16,8 @@ export interface WelcomeState {
 export interface DesktopWelcomeBackend {
   /** @returns the current Host policy; every read observes live configuration. */
   analyticsEnabled(): Promise<boolean>
-  readonly account: DesktopAccountBackend
+  /** DeepSeek account operations; undefined when the application is packaged without account sign-in. */
+  readonly account: DesktopAccountBackend | undefined
   /** @param event - desktop-owned fields. @returns after local Host intake. */
   report(event: ProductEvent): Promise<void>
   /** @returns Configured-key presence and the shared language preference, without credential values. */
@@ -38,12 +39,15 @@ function record(value: unknown): value is Record<string, unknown> {
  * Authenticate the native HTTP client through the Web application's launch URL.
  * @param authenticatedUrl - URL supplied by the running Desktop Host.
  * @param send - Electron session fetch, retaining the Web authentication cookie.
+ * @param cookies - Electron session cookie reader for the account stream.
+ * @param options - whether the application offers DeepSeek account sign-in.
  * @returns metadata reads and write-only credential operations over standard RPC.
  */
 export async function connectDesktopWelcome(
   authenticatedUrl: string,
   send: (input: string, init?: RequestInit) => Promise<Response>,
   cookies: () => Promise<string> = () => Promise.resolve(''),
+  options: { readonly signIn: boolean } = { signIn: true },
 ): Promise<DesktopWelcomeBackend> {
   const origin = new URL(authenticatedUrl).origin
   const authenticated = await send(authenticatedUrl, { credentials: 'include' })
@@ -68,7 +72,8 @@ export async function connectDesktopWelcome(
     }
     return envelope.result.value
   }
-  const account = desktopAccountBackend(origin, invoke, cookies)
+  // Without account sign-in the Host may not serve the account RPC namespace at all.
+  const account = options.signIn ? desktopAccountBackend(origin, invoke, cookies) : undefined
   const settingsAndReference = async () => {
     const settings = await invoke({ namespace: 'settings', method: 'describe', args: {} })
     if (!record(settings) || !Array.isArray(settings.namespaces)) throw new Error('desktop welcome: missing settings namespaces')
@@ -114,7 +119,7 @@ export async function connectDesktopWelcome(
     }
     if (ref !== undefined && !record(states[ref])) throw new Error('desktop welcome: missing credential metadata')
     return {
-      loggedIn: (await account.state()).status === 'credential-stored',
+      loggedIn: account !== undefined && (await account.state()).status === 'credential-stored',
       hasApiKey: Object.values(states).some(value => record(value) && value.configured === true),
       writable: ref !== undefined && record(states[ref]) && states[ref].writable === true,
       localePreference: localePreference(namespaces),
