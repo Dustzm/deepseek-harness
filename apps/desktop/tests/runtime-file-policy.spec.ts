@@ -32,13 +32,15 @@ it('omits development artifacts while preserving executable modules, assets and 
     '@deepseek-ai/libreoffice-kit-wasm/assets/soffice.data',
     '@deepseek-ai/libreoffice-kit-darwin-arm64/bin/libreoffice-kit',
     '.modules.yaml', '.pnpm-workspace-state-v1.json', '.bin/tool', '.pnpm/cache',
+    // electron-builder drops these from the archive regardless of the package.
+    'example/native.obj', 'example/symbols.pdb', 'example/.gitkeep',
   ]
   const retained = [
     'example/index.js', 'example/index.cjs', 'example/index.mjs', 'example/worker.js',
     'example/source.ts', 'example/src/entry.ts', 'example/test/runtime-fixture.json',
     'example/locale.json', 'example/data.map', 'example/module.wasm',
     'example/package.json', 'example/LICENSE', 'example/NOTICE', 'example/README.md',
-    'example/native.lib', 'example/native.obj', 'example/symbols.pdb',
+    'example/native.lib',
     'fs-ext/build/Release/fs_ext.node', 'fs-ext/build/Release/runtime.dll',
     'node-pty/prebuilds/win32-x64/conpty.node',
     'node-pty/prebuilds/win32-x64/conpty_console_list.node',
@@ -158,4 +160,12 @@ it.each([
     )
     expect(omitted === undefined).toBe(candidate === engine)
   }
+})
+
+it('omits the names and extensions electron-builder drops from every copied tree', () => {
+  const target = { platform: 'darwin' as const, arch: 'arm64' }
+  for (const path of ['undici/lib/llhttp/.gitkeep', 'pkg/.github/workflow.yml', 'pkg/yarn.lock', 'pkg/build/native.o', 'pkg/._index.js']) {
+    expect(desktopRuntimeFileExclusion(path, target, 'darwin-arm64')).toBe('electron-builder default exclusion')
+  }
+  expect(desktopRuntimeFileExclusion('undici/lib/llhttp/llhttp.wasm', target, 'darwin-arm64')).toBeUndefined()
 })
