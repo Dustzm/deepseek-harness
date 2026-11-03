@@ -26,6 +26,7 @@ import {
 import { capture } from '../../../scripts/release/process.ts'
 import { tarballFiles } from '../../../scripts/release/tarball.ts'
 import { resolveDesktopTargetBuildPaths } from './desktop-build-paths.mjs'
+import { resolveDesktopDistribution } from './desktop-distribution.mjs'
 
 const DSH_PACKAGE = '@deepseek-ai/dsh'
 const ROOT_PACKAGES = [DSH_PACKAGE, DESKTOP_HOST_PACKAGE] as const
@@ -51,13 +52,15 @@ function dependencyNames(manifest: Readonly<Record<string, unknown>>, section: s
 }
 
 /**
- * Select workspace dependencies rooted at dsh and its private Host; npm resolves external packages.
+ * Select workspace dependencies rooted at dsh, its private Host and any distribution packages; npm resolves external packages.
  * Reads the repository workspace manifest and package manifests to distinguish required local packages from npm-resolved externals.
  * @param available - Packed packages indexed by package name.
+ * @param extraRoots - Distribution package names that must ship beside dsh.
  * @returns Selected packages sorted by name.
  */
 export function selectDesktopPackageClosure(
   available: ReadonlyMap<string, PackedDesktopPackage>,
+  extraRoots: readonly string[] = [],
 ): PackedDesktopPackage[] {
   const workspace = yaml.load(readFileSync(join(REPOSITORY_ROOT, 'pnpm-workspace.yaml'), 'utf8')) as { packages: string[] }
   const workspaceNames = new Set(globSync(workspace.packages.map(pattern => `${pattern}/package.json`), { cwd: REPOSITORY_ROOT })
@@ -80,7 +83,7 @@ export function selectDesktopPackageClosure(
       if (available.has(dependency)) visit(dependency)
     }
   }
-  for (const name of ROOT_PACKAGES) {
+  for (const name of [...ROOT_PACKAGES, ...extraRoots]) {
     if (!available.has(name)) throw new Error(`desktop package set: packed inputs omit ${name}`)
     visit(name)
   }
@@ -127,9 +130,16 @@ export function assertDesktopHostPackageFiles(files: readonly string[]): void {
   }
 }
 
-/** Prepare a package set from release tarball directories. */
-export function prepareDesktopPackageSet(inputs: readonly string[], output: string): void {
-  const selected = selectDesktopPackageClosure(packedPackages(inputs))
+/**
+ * Prepare a package set from release tarball directories.
+ * @param inputs - Directories of release tarballs.
+ * @param output - Package-set directory to replace.
+ * @param distributionInput - Distribution tarball directory; every package in it becomes a root.
+ */
+export function prepareDesktopPackageSet(inputs: readonly string[], output: string, distributionInput?: string): void {
+  const available = packedPackages(distributionInput === undefined ? inputs : [...inputs, distributionInput])
+  const extraRoots = distributionInput === undefined ? [] : [...packedPackages([distributionInput]).keys()]
+  const selected = selectDesktopPackageClosure(available, extraRoots)
   const host = selected.find(packed => packed.manifest.name === DESKTOP_HOST_PACKAGE)
   if (host === undefined) throw new Error(`desktop package set: selected closure omits ${DESKTOP_HOST_PACKAGE}`)
   assertDesktopHostPackageFiles(tarballFiles(host.tarball))
@@ -171,7 +181,7 @@ function main(): void {
   })
   const inputs = (values.from ?? defaultInputs).map(path => resolve(REPOSITORY_ROOT, path))
   const output = values.out === undefined ? buildPaths.packageSet : resolve(REPOSITORY_ROOT, values.out)
-  prepareDesktopPackageSet(inputs, output)
+  prepareDesktopPackageSet(inputs, output, resolveDesktopDistribution()?.packages)
   console.log(`desktop package set: prepared ${output}`)
 }
 

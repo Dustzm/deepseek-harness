@@ -50,6 +50,13 @@ const operations = {
 }
 
 describe('desktop welcome window', () => {
+  it('passes a distribution product name and its sign-in choice to the preload', () => {
+    const options = welcomeWindowOptions('darwin', resolveDesktopLocale('zh-CN'), { productName: '通办', signIn: false })
+    expect(options.webPreferences?.additionalArguments).toEqual([
+      '--dsh-welcome-locale=zh-CN', '--dsh-welcome-sign-in=0', `--dsh-welcome-product=${encodeURIComponent('通办')}`,
+    ])
+  })
+
   it.each(['darwin', 'win32', 'linux'] as const)('keeps the %s preview fixed-size and sandboxed', (platform) => {
     const options = welcomeWindowOptions(platform, resolveDesktopLocale('zh-CN'))
     expect(options).toMatchObject({
@@ -57,7 +64,7 @@ describe('desktop welcome window', () => {
       resizable: false, maximizable: false, fullscreenable: false,
       webPreferences: {
         nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true,
-        additionalArguments: ['--dsh-welcome-locale=zh-CN'],
+        additionalArguments: ['--dsh-welcome-locale=zh-CN', '--dsh-welcome-sign-in=1'],
       },
     })
     expect(options.webPreferences?.preload).toMatch(/preload-welcome\.cjs$/u)

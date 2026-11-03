@@ -16,6 +16,7 @@ import {
   CLIENT_BUILD_RECORD_PATH,
   CLIENT_BUILD_PROFILE_SELECTOR,
   clientBuildProcessEnvironment,
+  readClientBuildIdentity,
   repositoryClientBuildEnvironment,
   resolveClientBuildEnvironment,
   writeClientBuildRecord,
@@ -169,7 +170,11 @@ async function main(): Promise<number> {
   }
 
   const repositoryEnvironment = repositoryClientBuildEnvironment(root, process.env)
-  const clientEnvironment = resolveClientBuildEnvironment(repositoryEnvironment, profile ?? process.env[CLIENT_BUILD_PROFILE_SELECTOR])
+  const clientEnvironment = resolveClientBuildEnvironment(
+    repositoryEnvironment,
+    profile ?? process.env[CLIENT_BUILD_PROFILE_SELECTOR],
+    readClientBuildIdentity(process.env),
+  )
   const environment = environmentOverlay(process.env, clientBuildProcessEnvironment(process.env, clientEnvironment))
   rmSync(resolve(root, CLIENT_BUILD_RECORD_PATH), { force: true })
   const gates = buildGates(root, scope, environment)

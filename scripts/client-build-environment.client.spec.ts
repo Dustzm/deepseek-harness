@@ -9,8 +9,11 @@ import {
   clientBuildEnvironmentDefines,
   clientBuildProcessEnvironment,
   clientBuildValueDefines,
+  distributionClientBuildEnvironment,
   officialClientBuildEnvironment,
+  readClientBuildIdentity,
   readClientBuildRecord,
+  releaseClientBuildEnvironment,
   repositoryClientBuildEnvironment,
   repositoryCommitHash,
   repositoryGitDirty,
@@ -139,6 +142,34 @@ describe('client build environment', () => {
       DSH_CLIENT_VERSION: '1.2.3',
     })
     expect(repositoryCommitHash('/unused', { DSH_CLIENT_COMMIT_HASH: COMMIT_HASH })).toBe(COMMIT_HASH.slice(0, 7))
+  })
+
+  it('replaces the official title with a selected distribution identity', () => {
+    const identity = { DSH_CLIENT_TITLE: 'Product', DSH_CLIENT_ICON: '/brand/icon.svg' }
+    const selector = { DSH_BUILD_CLIENT_IDENTITY: JSON.stringify(identity) }
+    expect(readClientBuildIdentity({})).toBeUndefined()
+    expect(readClientBuildIdentity(selector)).toEqual({ DSH_CLIENT_ICON: '/brand/icon.svg', DSH_CLIENT_TITLE: 'Product' })
+    const repository = { DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7), DSH_CLIENT_VERSION: '1.2.3', DSH_CLIENT_GIT_DIRTY: 'true' }
+    expect(resolveClientBuildEnvironment(repository, 'distribution', identity)).toEqual({
+      DSH_CLIENT_BUILD_PROFILE: 'distribution',
+      DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7),
+      DSH_CLIENT_ICON: '/brand/icon.svg',
+      DSH_CLIENT_TITLE: 'Product',
+      DSH_CLIENT_VERSION: '1.2.3',
+    })
+    expect(() => resolveClientBuildEnvironment(repository, 'distribution')).toThrow(/DSH_BUILD_CLIENT_IDENTITY is required/)
+    expect(() => resolveClientBuildEnvironment(repository, 'official', identity)).toThrow(/requires the distribution/)
+    expect(() => readClientBuildIdentity({ DSH_BUILD_CLIENT_IDENTITY: '{"DSH_CLIENT_VERSION":"9"}' })).toThrow(/cannot set DSH_CLIENT_VERSION/)
+    expect(() => readClientBuildIdentity({ DSH_BUILD_CLIENT_IDENTITY: '{"TITLE":"x"}' })).toThrow(/cannot set TITLE/)
+    expect(() => readClientBuildIdentity({ DSH_BUILD_CLIENT_IDENTITY: '[]' })).toThrow(/JSON object/)
+    const root = resolve(import.meta.dirname, '..')
+    const commit = { DSH_CLIENT_COMMIT_HASH: COMMIT_HASH }
+    expect(distributionClientBuildEnvironment(root, identity, commit)).toMatchObject({
+      DSH_CLIENT_BUILD_PROFILE: 'distribution', DSH_CLIENT_TITLE: 'Product',
+    })
+    expect(releaseClientBuildEnvironment(root, commit)).toEqual(officialClientBuildEnvironment(root, commit))
+    expect(releaseClientBuildEnvironment(root, { ...commit, ...selector }))
+      .toEqual(distributionClientBuildEnvironment(root, identity, commit))
   })
 
   it('owns repository version, commit, and dirty metadata for complete builds', () => {

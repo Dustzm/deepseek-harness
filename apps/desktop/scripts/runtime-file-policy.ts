@@ -1,5 +1,15 @@
 /** Desktop-only omissions from already installed production npm packages. */
 
+import { createRequire } from 'node:module'
+
+// electron-builder drops these names and extensions from every copied tree, so the sealed inventory omits them too.
+const builderDefaults = createRequire(import.meta.url)('app-builder-lib/out/fileMatcher.js') as {
+  readonly excludedNames: string
+  readonly excludedExts: string
+}
+const BUILDER_EXCLUDED_NAMES = new Set(builderDefaults.excludedNames.split(','))
+const BUILDER_EXCLUDED_EXTENSIONS = [...builderDefaults.excludedExts.split(','), 'pdb'].map(extension => `.${extension}`)
+
 /**
  * Identify build, diagnostic and other-platform files omitted from the immutable Desktop runtime.
  * Unrecognized assets and target runtime binaries are retained. Paths name the copied
@@ -44,5 +54,9 @@ export function desktopRuntimeFileExclusion(
     if (file.endsWith('.pdb')) return 'node-pty debug symbols'
   }
   if (name === '@koromix/koffi-win32-x64' && entry === 'win32_x64/koffi.lib') return 'Koffi import library'
+  if (parts.some(part => BUILDER_EXCLUDED_NAMES.has(part)) || file.startsWith('._')
+    || BUILDER_EXCLUDED_EXTENSIONS.some(extension => file.endsWith(extension))) {
+    return 'electron-builder default exclusion'
+  }
   return undefined
 }

@@ -19,6 +19,7 @@ Build Desktop installers locally or through Windows or macOS Actions, choose dep
 - [macOS self-hosted packaging](#macos-actions)
 - [Unsigned Windows test installer](#unsigned-windows-test-installer)
 - [Local macOS DMG without release signing](#local-macos-dmg-without-release-signing)
+- [Distribution packaging](#distribution-packaging)
 - [macOS release signing and diagnostics](#macos-release-signing)
 - [Directory builds and preparation](#directory-and-preparation)
 - [Local Official bundles from a loopback registry](#local-official-bundles-from-a-loopback-registry)
@@ -162,6 +163,28 @@ pnpm run package:desktop:mac:x64:unsigned
 Add `--check` to validate local configuration and tools without building, or `--dir` to stop at the unpacked application. The DMG is `apps/desktop/.desktop-build/targets/<target>/unsigned-artifacts/deepseek-harness-<version>-mac-<arch>-unsigned.dmg`. After all checks pass, the command prints `DMG:` followed by its absolute path. Open it and copy the application to a local test directory.
 
 These commands ignore `.env.macos` and inherited release settings, use `com.deepseek.harness` as the app ID, and omit automatic-update and mandatory-update configuration. Build tools, standard network proxies, and `DSH_DESKTOP_NPM_REGISTRY` remain available from the shell. They skip Developer ID signing, Apple notarization, temporary signing keychains, and notarization proxy changes. Electron receives a local ad-hoc signature without certificates so the modified executable can run; the DMG is unsigned. Both preparation and the assembled application still run runtime integrity and smoke checks. Local builds omit update feeds, ZIPs, and release completion records, and the upload commands cannot publish them. macOS may require approval in System Settings → Privacy & Security to open an unnotarized application.
+
+<a id="distribution-packaging"></a>
+
+## Distribution packaging
+
+Unsigned packaging commands accept `--distribution <absolute directory>` (or the `DSH_DESKTOP_DISTRIBUTION` environment variable) to package Desktop as another product. The directory's `distribution.json` declares the following, with file paths relative to that directory:
+
+| Field | Effect |
+|---|---|
+| `product` | Name, artifact file name, application ID, product version, deep-link scheme, and default data directory name (`~/<homeDirName>` when `DSH_HOME` is unset) |
+| `icons` | macOS and Windows application icons, with an optional DMG background |
+| `client` | `DSH_CLIENT_*` product identity embedded in the Web client build; `DSH_CLIENT_TITLE` is required |
+| `packages` | Directory of additional package tarballs; every package in it becomes a root of the bundled package set |
+| `profile.bundles` | Bundles a new Desktop profile starts with, which native recovery also keeps |
+| `signIn` | Whether Welcome offers DeepSeek account sign-in; with `false` it offers only the API key and the main process does not connect to the account service |
+| `welcome` | Optional welcome page directory whose `index.html` replaces the shipped Welcome page; the page uses `window.dshWelcome` (locale, `signIn`, `saveApiKey`, `skip`, and the rest) through the same isolated preload, under its own CSP |
+
+Loading validates every field and fails the package run on a missing or invalid one. A distribution build uses the `distribution` client build profile: the official values plus the `client` identity, with `DSH_CLIENT_BUILD_PROFILE` set to `distribution`; release packing verifies the build record against the same values. The application reports the product version while the bundled dsh runtime keeps the repository version. Only unsigned builds are supported, and their artifacts carry no automatic or mandatory update configuration.
+
+```sh
+pnpm --dir apps/desktop run package:mac:arm64:unsigned --distribution /abs/path/to/distribution
+```
 
 <a id="macos-release-signing"></a>
 

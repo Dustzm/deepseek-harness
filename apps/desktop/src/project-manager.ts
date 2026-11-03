@@ -62,10 +62,12 @@ export class DesktopProjectManager {
   /**
    * @param paths - Electron-owned package state and reserved desktop profile paths.
    * @param runtime - location of the bundled application runtime.
+   * @param bundles - bundles a new profile starts with and recovery keeps: a distribution's, otherwise the Web template's.
    */
   constructor(
     readonly paths: DesktopPaths,
     readonly runtime: { readonly dsh: string },
+    readonly bundles: readonly string[] = WEB_PROFILE.bundles,
   ) {}
 
   /**
@@ -74,7 +76,7 @@ export class DesktopProjectManager {
    * @returns Backup path after the locked profile write, or undefined if the patch was absent.
    */
   async disableAllPlugins(): Promise<string | undefined> {
-    return this.withLock(() => sanitizeProfile('dsh', this.paths.profile, WEB_PROFILE.bundles))
+    return this.withLock(() => sanitizeProfile('dsh', this.paths.profile, this.bundles))
   }
 
   /**
@@ -85,7 +87,7 @@ export class DesktopProjectManager {
       // Validation only: an unreadable or mismatched runtime descriptor stops preparation before the Host starts.
       readDesktopRuntime(this.runtime.dsh)
       migrateProfileSettings(this.paths.profile)
-      createPluginProfile(this.paths.profile)
+      createPluginProfile(this.paths.profile, this.bundles)
       removeLinkProjections(this.paths.profile)
     })
   }
@@ -130,8 +132,17 @@ export class DesktopProjectManager {
   }
 }
 
-/** Create build-only project metadata for materializing the signed runtime. */
-export function createRuntimeProjectMetadata(projectDir: string, release: DesktopRelease): void {
+/**
+ * Create build-only project metadata for materializing the signed runtime.
+ * @param projectDir - Build project directory holding the package set.
+ * @param release - Release identity the package set must match.
+ * @param bundles - Profile bundles; a distribution's, otherwise the Web template's.
+ */
+export function createRuntimeProjectMetadata(
+  projectDir: string,
+  release: DesktopRelease,
+  bundles: readonly string[] = WEB_PROFILE.bundles,
+): void {
   mkdirSync(projectDir, { recursive: true, mode: 0o700 })
   const packageSet = verifyDesktopCorePackageSet(projectDir, release.version)
   const manifest = {
@@ -139,7 +150,7 @@ export function createRuntimeProjectMetadata(projectDir: string, release: Deskto
     private: true,
     version: '0.0.0',
     dependencies: desktopCorePackageOverrides(packageSet),
-    dsh: { profile: { bundles: [...WEB_PROFILE.bundles] } },
+    dsh: { profile: { bundles: [...bundles] } },
   }
   writeJson(join(projectDir, 'package.json'), manifest)
   writeFileSync(
@@ -170,7 +181,11 @@ export function createDevelopmentProjectMetadata(projectDir: string, release: De
   writeFileSync(join(projectDir, 'pnpm-workspace.yaml'), workspaceFile(), { mode: 0o600 })
 }
 
-/** Create the first external plugin profile without running a package manager. */
-export function createPluginProfile(projectDir: string): void {
-  initProfile(projectDir, WEB_PROFILE.bundles)
+/**
+ * Create the first external plugin profile without running a package manager.
+ * @param projectDir - Desktop profile directory.
+ * @param bundles - Bundles a new profile starts with; a distribution's, otherwise the Web template's.
+ */
+export function createPluginProfile(projectDir: string, bundles: readonly string[] = WEB_PROFILE.bundles): void {
+  initProfile(projectDir, bundles)
 }

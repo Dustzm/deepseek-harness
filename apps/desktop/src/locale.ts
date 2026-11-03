@@ -345,27 +345,58 @@ export interface DesktopLocale {
   readonly messages: DesktopMessages
 }
 
-/** Resolve Electron's locale to one shipped Desktop dictionary. */
-export function resolveDesktopLocale(locale: string): DesktopLocale {
-  return locale.toLowerCase().startsWith('zh')
+const CJK_CHARACTER = /[\u3000-\u303f\u3400-\u9fff\uff00-\uffef]/u
+
+/**
+ * Replace the shipped product name throughout one dictionary.
+ * A space beside the name is dropped where the name and its neighbor are both CJK characters, as in `关于通办`.
+ * @param messages - Shipped dictionary.
+ * @param productName - Distribution product name.
+ * @returns The dictionary naming the distribution's product.
+ */
+export function brandDesktopMessages(messages: DesktopMessages, productName: string): DesktopMessages {
+  const cjk = (character: string | undefined): boolean => character !== undefined && CJK_CHARACTER.test(character)
+  const brand = (value: string): string => value.replaceAll(/( ?)DeepSeek Harness( ?)/gu,
+    (match: string, before: string, after: string, offset: number) => {
+      const lead = before !== '' && !(cjk(value[offset - 1]) && cjk(productName[0])) ? ' ' : ''
+      const trail = after !== '' && !(cjk(value[offset + match.length]) && cjk(productName.at(-1))) ? ' ' : ''
+      return `${lead}${productName}${trail}`
+    })
+  return Object.fromEntries(Object.entries(messages).map(([key, value]) => [key, brand(value)])) as DesktopMessages
+}
+
+/**
+ * Resolve Electron's locale to one shipped Desktop dictionary.
+ * @param locale - Electron or document locale.
+ * @param productName - Distribution product name replacing DeepSeek Harness; omitted for DeepSeek Harness.
+ * @returns The selected dictionary.
+ */
+export function resolveDesktopLocale(locale: string, productName?: string): DesktopLocale {
+  const selected: DesktopLocale = locale.toLowerCase().startsWith('zh')
     ? { id: 'zh-CN', messages: zh }
     : { id: 'en', messages: en }
+  return productName === undefined ? selected : { id: selected.id, messages: brandDesktopMessages(selected.messages, productName) }
 }
 
 /**
  * Choose a built-in dictionary from the shared preference, then ordered OS languages.
  * @param preference - explicit locale.preference, or null when no language was selected.
  * @param languages - operating-system languages in preference order.
+ * @param productName - Distribution product name replacing DeepSeek Harness; omitted for DeepSeek Harness.
  * @returns the supported dictionary, falling back to English.
  */
-export function resolveDesktopStartupLocale(preference: string | null, languages: readonly string[]): DesktopLocale {
+export function resolveDesktopStartupLocale(
+  preference: string | null,
+  languages: readonly string[],
+  productName?: string,
+): DesktopLocale {
   const selected = preference?.toLowerCase()
-  if (selected === 'zh' || selected === 'en') return resolveDesktopLocale(selected)
+  if (selected === 'zh' || selected === 'en') return resolveDesktopLocale(selected, productName)
   for (const language of languages) {
     const primary = language.toLowerCase().split('-')[0]
-    if (primary === 'zh' || primary === 'en') return resolveDesktopLocale(primary)
+    if (primary === 'zh' || primary === 'en') return resolveDesktopLocale(primary, productName)
   }
-  return resolveDesktopLocale('en')
+  return resolveDesktopLocale('en', productName)
 }
 
 /** Replace named placeholders in one locale-owned message. */

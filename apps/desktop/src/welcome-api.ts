@@ -53,8 +53,20 @@ export interface WelcomeOperations {
   skip(): Promise<void>
 }
 
+/** What the welcome window offers in this application. */
+export interface WelcomePresentation {
+  /** Distribution product name replacing DeepSeek Harness in welcome copy; omitted for DeepSeek Harness. */
+  readonly productName?: string
+  /** Whether DeepSeek account sign-in is offered; a distribution without the account service offers only the API key. */
+  readonly signIn: boolean
+  /** Whether the distribution's own page (`renderer/distribution-welcome/index.html`) replaces the shipped one. */
+  readonly distributionPage?: boolean
+}
+
 /** The renderer receives localized copy, login operations, and safe account snapshots. */
 export type WelcomeApi = DesktopLocale & WelcomeOperations & {
+  /** Whether DeepSeek account sign-in is offered. */
+  readonly signIn: boolean
   /** @param listener - safe account snapshot recipient. @returns subscription disposer. */
   onAccountState(listener: (state: AccountView) => void): () => void
 }
