@@ -197,6 +197,8 @@ export class UiConversation extends Service {
   private readonly images: HistoricalImageCache
   private readonly contextMeterVisible = createSnapshotStore<boolean>(true)
   private contextMeterClaims = 0
+  private readonly heroWorkspaceInComposerState = createSnapshotStore<boolean>(false)
+  private heroWorkspaceRequests = 0
 
   /**
    * @param ctx - owning Client context.
@@ -254,6 +256,29 @@ export class UiConversation extends Service {
         if (this.contextMeterClaims === 0) this.contextMeterVisible.set(true)
       }
     }, 'uiConversation.claimContextMeter')
+    return () => { void dispose() }
+  }
+
+  /** Live placement of the blank-session Workspace trigger; `true` while any request from `placeHeroWorkspaceInComposer()` is held. */
+  get heroWorkspaceInComposer(): ObservableSnapshot<boolean> {
+    return this.heroWorkspaceInComposerState
+  }
+
+  /**
+   * Move the blank-session Workspace trigger and its picker from the row above
+   * the hero composer into the composer's tool row, after the add button, for
+   * the caller's lifetime.
+   * @returns idempotent release.
+   */
+  placeHeroWorkspaceInComposer(): () => void {
+    const dispose = this.ctx.effect(() => {
+      this.heroWorkspaceRequests += 1
+      this.heroWorkspaceInComposerState.set(true)
+      return () => {
+        this.heroWorkspaceRequests -= 1
+        if (this.heroWorkspaceRequests === 0) this.heroWorkspaceInComposerState.set(false)
+      }
+    }, 'uiConversation.placeHeroWorkspaceInComposer')
     return () => { void dispose() }
   }
 

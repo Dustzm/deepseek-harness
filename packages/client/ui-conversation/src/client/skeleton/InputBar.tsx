@@ -50,7 +50,7 @@ export const InputBar = memo(function InputBar({
   renderSlot, useBusyEnter, useFileUploads, useNotices, useLexicon, useMenuLauncher, useStopShortcut, useContextMeter,
   useProjection, sessionId, variant, disabled: inert = false, blocked,
   workspacePickerOpen = false, onRequestWorkspace,
-  placeholder, accessory,
+  placeholder, accessory, toolsLeading,
 }: InputBarProps) {
   const input = useInput(s => s)
   const notice = useNotices(s => s)
@@ -453,6 +453,7 @@ export const InputBar = memo(function InputBar({
                 <IconPlusOutlineMedium size={14} />
               </button>
             </Tooltip>
+            {toolsLeading}
             <input
               ref={fileInputRef}
               type="file"
