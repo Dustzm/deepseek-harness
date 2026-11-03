@@ -33,6 +33,7 @@
   gap: 4px 12px;
   box-sizing: border-box;
   width: 100%;
+  max-width: var(--dsh-composer-card-max-width);
   min-width: 0;
   padding: 6px 8px 0;
 }
