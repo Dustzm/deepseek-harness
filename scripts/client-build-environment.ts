@@ -16,6 +16,17 @@ const CLIENT_BUILD_ENV_PREFIX = 'DSH_CLIENT_'
 /** Non-public selector used by build orchestration to request a named client profile. */
 export const CLIENT_BUILD_PROFILE_SELECTOR = 'DSH_BUILD_CLIENT_PROFILE'
 
+/**
+ * Non-public selector carrying a distribution's product identity: a JSON object of
+ * `DSH_CLIENT_*` values that the `distribution` profile adds to the official values.
+ */
+export const CLIENT_BUILD_IDENTITY_SELECTOR = 'DSH_BUILD_CLIENT_IDENTITY'
+
+/** Values the build owns, which a distribution identity cannot set. */
+const BUILD_OWNED_CLIENT_VARIABLES = new Set([
+  'DSH_CLIENT_BUILD_PROFILE', 'DSH_CLIENT_COMMIT_HASH', 'DSH_CLIENT_GIT_DIRTY', 'DSH_CLIENT_VERSION',
+])
+
 /** Public client environment required by official DSH artifacts. */
 const OFFICIAL_CLIENT_BUILD_ENVIRONMENT = {
   DSH_CLIENT_BUILD_PROFILE: 'official',
@@ -149,6 +160,68 @@ export function officialClientBuildEnvironment(
   }
 }
 
+/**
+ * Read the distribution identity selected for a build.
+ * @param environment - process environment that may carry {@link CLIENT_BUILD_IDENTITY_SELECTOR}.
+ * @returns the identity values, or undefined when no distribution is selected.
+ */
+export function readClientBuildIdentity(environment: NodeJS.ProcessEnv): ClientBuildEnvironment | undefined {
+  const text = environment[CLIENT_BUILD_IDENTITY_SELECTOR]
+  if (text === undefined || text === '') return undefined
+  let value: unknown
+  try {
+    value = JSON.parse(text)
+  } catch (error) {
+    throw new Error(`${CLIENT_BUILD_IDENTITY_SELECTOR} must be a JSON object: ${String(error)}`)
+  }
+  if (!isObject(value)) throw new Error(`${CLIENT_BUILD_IDENTITY_SELECTOR} must be a JSON object`)
+  const entries = Object.entries(value)
+  for (const [name, entry] of entries) {
+    if (!name.startsWith(CLIENT_BUILD_ENV_PREFIX) || BUILD_OWNED_CLIENT_VARIABLES.has(name) || typeof entry !== 'string') {
+      throw new Error(`${CLIENT_BUILD_IDENTITY_SELECTOR} cannot set ${name}`)
+    }
+  }
+  if (entries.length === 0) throw new Error(`${CLIENT_BUILD_IDENTITY_SELECTOR} must set at least one value`)
+  return Object.fromEntries(entries.sort(([left], [right]) => left.localeCompare(right))) as Record<string, string>
+}
+
+/**
+ * Resolve the exact public values required by a distribution build at one commit:
+ * the official commit and version with the distribution's identity in place of the official title.
+ * @param root - repository root whose HEAD must match the built source.
+ * @param identity - distribution identity values.
+ * @param environment - optional explicit commit source for non-Git build environments.
+ * @returns complete distribution client environment.
+ */
+export function distributionClientBuildEnvironment(
+  root: string,
+  identity: ClientBuildEnvironment,
+  environment: NodeJS.ProcessEnv = process.env,
+): Readonly<Record<`DSH_CLIENT_${string}`, string>> {
+  return {
+    DSH_CLIENT_COMMIT_HASH: repositoryCommitHash(root, environment),
+    DSH_CLIENT_VERSION: repositoryVersion(root),
+    ...identity,
+    DSH_CLIENT_BUILD_PROFILE: 'distribution',
+  }
+}
+
+/**
+ * Resolve the client environment release artifacts must carry: the distribution's when one is selected, otherwise official.
+ * @param root - repository root whose HEAD must match the built source.
+ * @param environment - process environment that may select a distribution identity.
+ * @returns complete public client environment for release artifacts.
+ */
+export function releaseClientBuildEnvironment(
+  root: string,
+  environment: NodeJS.ProcessEnv = process.env,
+): Readonly<Record<`DSH_CLIENT_${string}`, string>> {
+  const identity = readClientBuildIdentity(environment)
+  return identity === undefined
+    ? officialClientBuildEnvironment(root, environment)
+    : distributionClientBuildEnvironment(root, identity, environment)
+}
+
 /** Digest of every client artifact produced by the complete root build. */
 interface ClientArtifactDigest {
   /** Number of files covered by the digest. */
@@ -182,14 +255,19 @@ function clientBuildEnvironment(environment: NodeJS.ProcessEnv): ClientBuildEnvi
  * Resolve the exact public environment selected for a complete client build.
  * @param environment - parent process environment.
  * @param profile - explicit profile, or the non-public selector when omitted.
+ * @param identity - distribution identity, required by and only accepted with the `distribution` profile.
  * @returns the inherited public values when no profile is selected, otherwise the named profile.
  */
 export function resolveClientBuildEnvironment(
   environment: NodeJS.ProcessEnv,
   profile: string | undefined = environment[CLIENT_BUILD_PROFILE_SELECTOR],
+  identity?: ClientBuildEnvironment,
 ): ClientBuildEnvironment {
+  if (identity !== undefined && profile !== 'distribution') {
+    throw new Error(`${CLIENT_BUILD_IDENTITY_SELECTOR} requires the distribution client build profile`)
+  }
   if (profile === undefined) return clientBuildEnvironment(environment)
-  if (profile === 'official') {
+  if (profile === 'official' || profile === 'distribution') {
     const commitHash = environment[CLIENT_COMMIT_HASH_VARIABLE]
     const version = environment[CLIENT_VERSION_VARIABLE]
     if (commitHash === undefined) {
@@ -198,13 +276,24 @@ export function resolveClientBuildEnvironment(
     if (version === undefined) {
       throw new Error(`${CLIENT_VERSION_VARIABLE} is required for the official client build profile`)
     }
+    if (profile === 'official') {
+      return {
+        DSH_CLIENT_COMMIT_HASH: commitHash,
+        DSH_CLIENT_VERSION: version,
+        ...OFFICIAL_CLIENT_BUILD_ENVIRONMENT,
+      }
+    }
+    if (identity === undefined) {
+      throw new Error(`${CLIENT_BUILD_IDENTITY_SELECTOR} is required for the distribution client build profile`)
+    }
     return {
       DSH_CLIENT_COMMIT_HASH: commitHash,
       DSH_CLIENT_VERSION: version,
-      ...OFFICIAL_CLIENT_BUILD_ENVIRONMENT,
+      ...identity,
+      DSH_CLIENT_BUILD_PROFILE: 'distribution',
     }
   }
-  throw new Error(`unknown client build profile ${JSON.stringify(profile)}; expected "official"`)
+  throw new Error(`unknown client build profile ${JSON.stringify(profile)}; expected "official" or "distribution"`)
 }
 
 /**
@@ -219,7 +308,8 @@ export function clientBuildProcessEnvironment(
 ): NodeJS.ProcessEnv {
   const child: NodeJS.ProcessEnv = {}
   for (const [name, value] of Object.entries(environment)) {
-    if (name === CLIENT_BUILD_PROFILE_SELECTOR || name.startsWith(CLIENT_BUILD_ENV_PREFIX)) continue
+    if (name === CLIENT_BUILD_PROFILE_SELECTOR || name === CLIENT_BUILD_IDENTITY_SELECTOR) continue
+    if (name.startsWith(CLIENT_BUILD_ENV_PREFIX)) continue
     child[name] = value
   }
   return { ...child, ...clientEnvironment }
