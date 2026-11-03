@@ -422,7 +422,11 @@ export interface ConversationInjected {
   /** Connect and open a blank Session in the selected Workspace. */
   selectWorkspace: (workspaceId: WorkspaceId) => Promise<void>
   /** Session-addressed composer block source, or the stable absent source. */
-  hooks: { composerBlock: ObservableSnapshot<ComposerBlock | undefined> }
+  hooks: {
+    composerBlock: ObservableSnapshot<ComposerBlock | undefined>
+    /** Whether the blank-session Workspace trigger sits in the composer tool row (`uiConversation.placeHeroWorkspaceInComposer`). */
+    heroWorkspaceInComposer: ObservableSnapshot<boolean>
+  }
 }
 
 /** Business callbacks injected into the strict Session body. */
@@ -506,6 +510,8 @@ export interface ComposerBarOwnerProps {
   placeholder?: string
   /** Optional content rendered above the composer surface. */
   accessory?: ReactNode
+  /** Optional controls rendered in the tool row right after the add button, such as the hero Workspace trigger. */
+  toolsLeading?: ReactNode
 }
 
 /** Package-private operations injected into the resident composer bar. */

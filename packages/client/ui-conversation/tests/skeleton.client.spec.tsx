@@ -139,6 +139,8 @@ function mount(
     nestedSubagent?: boolean
     /** A composer block another plugin raised for this session. */
     composerBlock?: { reason: string }
+    /** Whether `uiConversation.placeHeroWorkspaceInComposer()` is held. */
+    workspaceInComposer?: boolean
     /** Registered occupant of the hero Workspace chip seat; omitted renders the hero's own chip. */
     heroChip?: (owner: HeroWorkspaceChipOwnerProps) => ReactNode
     /** Mutable view ledger used by registration-order regressions. */
@@ -366,6 +368,7 @@ function mount(
       ...allowAllAccess,
       useProjection: (() => undefined),
       useComposerBlock: select => select(options.composerBlock),
+      useHeroWorkspaceInComposer: select => select(options.workspaceInComposer ?? false),
       useInput,
       inputActions,
       renderSlot,
@@ -620,6 +623,17 @@ describe('ConversationRoot resident composer', () => {
     fireEvent.click(b.view.getByRole('button', { name: 'work in one' }))
     expect((b.pickerOwner() as { open: boolean }).open).toBe(true)
     expect(b.view.getByRole('button', { name: 'work in one' }).getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('hero phase: a placement request moves the Workspace trigger into the composer tool row', () => {
+    const b = mount(sessionSnapshotOf({ blank: true }), undefined, undefined, { workspaceInComposer: true })
+    const trigger = b.view.getByRole('button', { name: '选择工作区' })
+    const add = b.view.getByRole('button', { name: /指令|commands/i })
+    // Same tool row as the add button, right after it.
+    expect(trigger.parentElement).toBe(add.closest('div'))
+    expect(add.compareDocumentPosition(trigger) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(trigger)
+    expect((b.pickerOwner() as { open: boolean }).open).toBe(true)
   })
 
   it('keeps a rejected first prompt engaging instead of returning to the Hero', () => {
