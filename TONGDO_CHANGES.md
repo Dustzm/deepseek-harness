@@ -19,6 +19,8 @@
 | 布局内容面 token：`--dsh-frame-content-inset`、`--dsh-frame-canvas`、`--dsh-frame-content-radius`、`--dsh-frame-content-shadow`、`--dsh-frame-sidebar-fill`、`--dsh-frame-sidebar-rule` | 通用扩展接口 | `packages/client/ui-layout`（`AppFrame.module.css`、中英 README）、`packages/client/ui-sidebar-right`（`SidebarRight.module.css`、中英 README） | 三栏框架的底色、侧栏边线与中栏形状写死在 CSS Module 里，下游无法把会话区与右侧面板做成浮在窗口底色上的圆角内容面；变量未设置时布局不变 | 上游提供等价主题接口后可去掉 |
 | 会话列表分组方式新增「按状态」（`SessionGroupBy` 的 `'status'`） | 通用扩展接口 | `packages/client/ui-workspace`（`stores.ts`、`tree.ts` 的 `sectionByStatus`、`rows/WorkspaceBrowser.tsx` 与样式、`locales.ts`、测试、中英 README） | 分组方式只有按工作区、工作区树与单列表，用户看不出哪些任务在跑、哪些在等自己；新增一种分组，把单列表的行分到进行中、等你处理与其他之下，不改其余三种分组 | 上游提供等价分组后可去掉 |
 | 设置分区的导航图标扩展位 `settings.section.icon` | 通用扩展接口 | `packages/client/ui-settings`（`contract/slots.ts`、中英 README）、`packages/client/ui-settings-general`（`SettingsRoot.tsx`、`index.ts`、`shell-contract.ts`、测试、中英 README） | 设置导航的图标按分区 id 写死在外壳里，其余分区一律是齿轮，下游给自己的分区配不了图标；新增 keyed 扩展位，没有条目时用原图形 | 上游提供等价扩展位后可去掉 |
+| 子会话可不显示权限按钮：`ctx.uiPermission.hideInChildSessions()`；`custom` 权限状态译为「自定义」 | 通用扩展接口 | `packages/client/ui-permission-presets`（`presentation-service.ts`、`PermissionSelect.tsx`、`presentation.ts`、`locales.ts`、`index.ts`、测试、中英 README） | 子代理与团队成员的权限由父会话创建时设定，输入框里仍显示一个对不上预设、且未翻译的「Custom」；新增按调用方 fiber 释放的认领，没有认领时行为不变，`custom` 补上翻译 | 上游提供等价选项或修好翻译后可去掉 |
+| 团队投影带上队员职责描述（`TeamMemberProjection.description`） | 通用扩展接口 | `packages/experimental/agent-team`（`types.ts`、`projection.ts`、测试、中英 README）、`docs/subsystems/agent-team` 中英、持久化目录重新生成（只有行号变化） | 主理生成队员时写的职责描述已持久保存，但不在给浏览器的团队投影里，界面显示不了队员负责什么；只读展示，不进入模型请求 | 上游投影带上描述后可去掉 |
 
 ## 核心仓库如何使用这些改动
 

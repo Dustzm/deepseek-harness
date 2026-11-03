@@ -87,6 +87,8 @@ interface TeamMemberProjection {
   readonly role: 'lead' | 'teammate'
   /** Durable lifecycle; the Lead row is always `active`. Turn activity comes from Session status. */
   readonly phase: TeamMemberPhase
+  /** The delegated responsibility the Lead gave when spawning a teammate; absent on the Lead row. */
+  readonly description?: string
   readonly error?: string
 }
 ```

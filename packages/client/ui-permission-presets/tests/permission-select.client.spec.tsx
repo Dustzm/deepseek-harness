@@ -35,6 +35,8 @@ function setup(options: {
   catalog?: PermissionCatalog | null
   locked?: boolean
   select?: (preset: string) => Promise<boolean>
+  childSession?: boolean
+  hiddenInChildSessions?: boolean
 } = {}) {
   const selection = createSnapshotStore<{ value: PermissionSelection | undefined }>({
     value: 'selection' in options ? options.selection : { currentValue: 'workspace-write' },
@@ -49,6 +51,10 @@ function setup(options: {
     locked: options.locked ?? false,
     useProjection,
     usePermissionCatalog: bindSnapshotSelector(catalog),
+    useHiddenInChildSessions: bindSnapshotSelector(createSnapshotStore<boolean>(options.hiddenInChildSessions ?? false)),
+    useSession: bindSnapshotSelector(createSnapshotStore({
+      subagent: options.childSession === true ? { address: { parentSessionId: 'parent', childSessionId: 'child', mode: 'continuable' } } : null,
+    })),
     select,
     t,
   } as unknown as PermissionSelectProps
@@ -61,6 +67,20 @@ function trigger(): HTMLButtonElement {
 }
 
 describe('PermissionSelect', () => {
+  it('omits the seat in a delegated child session only while presentation hides it there', () => {
+    expect(setup({ childSession: true }).view.container.innerHTML).not.toBe('')
+    cleanup()
+    expect(setup({ childSession: true, hiddenInChildSessions: true }).view.container.innerHTML).toBe('')
+    cleanup()
+    setup({ childSession: false, hiddenInChildSessions: true })
+    expect(trigger()).toBeTruthy()
+  })
+
+  it('names settings that match no preset with the localized custom label', () => {
+    setup({ selection: { currentValue: 'custom' } })
+    expect(trigger().textContent).toContain(accessZh['preset.custom'])
+  })
+
   it('renders only when both the Session selection and process catalog exist', () => {
     const missingSelection = setup({ selection: undefined })
     expect(missingSelection.view.container.innerHTML).toBe('')
@@ -226,15 +246,15 @@ describe('PermissionSelect', () => {
 
   it('falls back to an unknown current value and clears a rejected optimistic choice', async () => {
     const select = vi.fn(() => Promise.reject(new Error('rejected')))
-    const { selection } = setup({ selection: { currentValue: 'custom' }, select })
-    expect(trigger().textContent).toBe('Custom')
+    const { selection } = setup({ selection: { currentValue: 'site-policy' }, select })
+    expect(trigger().textContent).toBe('Site Policy')
     expect(trigger().querySelectorAll('svg')).toHaveLength(1)
 
     fireEvent.click(trigger())
     fireEvent.click(screen.getByRole('menuitem', { name: '工作区内修改' }))
     expect(trigger().textContent).toBe('工作区内修改')
     await act(async () => {})
-    expect(trigger().textContent).toBe('Custom')
+    expect(trigger().textContent).toBe('Site Policy')
     act(() => { selection.set({ value: { currentValue: 'workspace-write' } }) })
     expect(trigger().textContent).toBe('工作区内修改')
   })

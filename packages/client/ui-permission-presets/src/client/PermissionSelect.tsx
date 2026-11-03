@@ -63,6 +63,8 @@ export interface PermissionSelectInjected {
   hooks: {
     /** One process catalog shared with the slash popup. */
     permissionCatalog: HostObservable<PermissionCatalogState>
+    /** Whether delegated child sessions omit the seat (`uiPermission.hideInChildSessions`). */
+    hiddenInChildSessions: HostObservable<boolean>
   }
   /** Submit one current-session preset through the existing command writer. */
   select: (preset: string) => Promise<boolean>
@@ -75,9 +77,12 @@ export type PermissionSelectProps =
   & PropsLocale<typeof PERMISSION_ACCESS_NS>
 
 export function PermissionSelect({
-  locked, select, usePermissionCatalog, useProjection, t,
+  locked, select, usePermissionCatalog, useHiddenInChildSessions, useSession, useProjection, t,
 }: PermissionSelectProps) {
   const selection = useProjection('permissions')
+  const hiddenInChildSessions = useHiddenInChildSessions(hidden => hidden)
+  const childSession = useSession(session => session.subagent !== null)
+  const hiddenHere = hiddenInChildSessions && childSession
   const catalog = usePermissionCatalog(state => state.value)
   const [pick, setPick] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
@@ -92,7 +97,7 @@ export function PermissionSelect({
     setConfirmation(null)
   }, [catalog, confirmation, locked, selection])
 
-  if (selection === undefined || catalog === null) return null
+  if (selection === undefined || catalog === null || hiddenHere) return null
 
   const currentValue = pick !== null && catalog.options.some(option => option.value === pick)
     ? pick : selection.currentValue

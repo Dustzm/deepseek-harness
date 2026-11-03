@@ -327,6 +327,23 @@ describe('ui-permission browser plugin', () => {
       .rejects.toThrow(/not materialized/)
   })
 
+  it('hides the permission seat in child sessions while a caller holds the presentation claim', async () => {
+    const b = await bench()
+    const presentation = b.ctx.get('uiPermission')
+    expect(presentation?.hiddenInChildSessions.getSnapshot()).toBe(false)
+    const feature = b.ctx.inject(['uiPermission'], (featureCtx) => { featureCtx.uiPermission.hideInChildSessions() })
+    await feature.await()
+    const release = presentation?.hideInChildSessions()
+    expect(presentation?.hiddenInChildSessions.getSnapshot()).toBe(true)
+    release?.()
+    release?.()
+    expect(presentation?.hiddenInChildSessions.getSnapshot()).toBe(true)
+    await feature.dispose()
+    expect(presentation?.hiddenInChildSessions.getSnapshot()).toBe(false)
+    await b.fiber.dispose()
+    expect(b.ctx.get('uiPermission')).toBeUndefined()
+  })
+
   it('disposal removes the decoration (HMR safety)', async () => {
     const b = await bench()
     expect(b.decoration()).toBeDefined()

@@ -36,6 +36,7 @@ import type { CommandUiContract, SelectOption } from '@deepseek-ai/dsh-client-ui
 import type { ClientSessionContext } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { PermissionCatalogDirectory } from './catalog.ts'
+import { PermissionPresentation } from './presentation-service.ts'
 import { PermissionSelect } from './PermissionSelect.tsx'
 import type { PermissionSelectInjected } from './PermissionSelect.tsx'
 import { PermissionRow } from './PermissionRow.tsx'
@@ -49,6 +50,7 @@ import {
 import { PermissionPresetSettingsController } from './settings-store.ts'
 
 export type { PermissionRowInjected, PermissionRowProps } from './PermissionRow.tsx'
+export type { PermissionPresentation } from './presentation-service.ts'
 export type { PermissionCatalogState } from './catalog.ts'
 export type { PermissionSelectInjected, PermissionSelectProps } from './PermissionSelect.tsx'
 export type {
@@ -132,6 +134,7 @@ export function apply(ctx: ClientContext): void {
   }
 
   const catalog = new PermissionCatalogDirectory(ctx)
+  const presentation = new PermissionPresentation(ctx)
   ctx.effect(() => () => { catalog.dispose() }, 'ui-permission: process catalog directory')
   ctx.effect(
     // Only an invalidation makes displayed options stale; publishing the result
@@ -168,7 +171,7 @@ export function apply(ctx: ClientContext): void {
     name: 'conversation.input.permission',
     locale: PERMISSION_ACCESS_NS,
     inject: (sessionId: SessionId): PermissionSelectInjected => ({
-      hooks: { permissionCatalog: catalog.store },
+      hooks: { permissionCatalog: catalog.store, hiddenInChildSessions: presentation.hiddenInChildSessions },
       select: preset => submit(sessionId, preset),
     }),
   }, PermissionSelect))
