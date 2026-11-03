@@ -18,7 +18,6 @@
 | 输入框模型选择器右侧的状态扩展位 `conversation.input.status` | 通用扩展接口 | `packages/client/ui-conversation`（`contract/slots.ts`、`apply.ts`、`InputBar.tsx`、测试、中英 README） | 模型选择器与发送键之间只有 single 的 `conversation.input.activity`，它是可展开整条工具栏的活动位，下游的占用率之类状态读数放进去会与真正的活动占用方冲突；新增 list 扩展位，活动展开时与辅助控件一起隐藏，空列表时布局不变 | 上游提供等价扩展位后可去掉 |
 | 布局内容面 token：`--dsh-frame-content-inset`、`--dsh-frame-canvas`、`--dsh-frame-content-radius`、`--dsh-frame-content-shadow`、`--dsh-frame-sidebar-fill`、`--dsh-frame-sidebar-rule` | 通用扩展接口 | `packages/client/ui-layout`（`AppFrame.module.css`、中英 README）、`packages/client/ui-sidebar-right`（`SidebarRight.module.css`、中英 README） | 三栏框架的底色、侧栏边线与中栏形状写死在 CSS Module 里，下游无法把会话区与右侧面板做成浮在窗口底色上的圆角内容面；变量未设置时布局不变 | 上游提供等价主题接口后可去掉 |
 | 会话列表分组方式新增「按状态」（`SessionGroupBy` 的 `'status'`） | 通用扩展接口 | `packages/client/ui-workspace`（`stores.ts`、`tree.ts` 的 `sectionByStatus`、`rows/WorkspaceBrowser.tsx` 与样式、`locales.ts`、测试、中英 README） | 分组方式只有按工作区、工作区树与单列表，用户看不出哪些任务在跑、哪些在等自己；新增一种分组，把单列表的行分到进行中、等你处理与其他之下，不改其余三种分组 | 上游提供等价分组后可去掉 |
-| 输入框设置控件移到卡片下方：`ctx.uiConversation.placeComposerControlsBelow()` | 通用扩展接口 | `packages/client/ui-conversation`（`conversation/claims.ts`、`conversation/assembly.ts`、`apply.ts`、`contract/slots.ts`、`InputBar.tsx` 与样式、测试、中英 README） | 权限、计划、模型与状态席位写死在输入卡片的工具行里，下游无法把卡片做成只有输入与发送的简洁形态；认领随调用方 fiber 释放，没有认领时布局不变 | 上游提供等价布局选项后可去掉 |
 
 ## 核心仓库如何使用这些改动
 

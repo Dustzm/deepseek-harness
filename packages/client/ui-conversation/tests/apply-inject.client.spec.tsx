@@ -500,7 +500,6 @@ describe('Conversation inject API', () => {
     const absent = injectBar(undefined)
     expect(absent.keyboard).toBeUndefined()
     expect(absent.hooks.contextMeter.getSnapshot()).toBe(true)
-    expect(absent.hooks.composerControlsBelow.getSnapshot()).toBe(false)
     expect(absent.toggleCommandMenu).toBeUndefined()
     expect(absent.stop).toBeUndefined()
     expect(absent.hooks.notices.getSnapshot()).toBeNull()

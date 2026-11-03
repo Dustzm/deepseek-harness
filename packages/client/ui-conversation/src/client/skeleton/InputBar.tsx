@@ -48,7 +48,6 @@ export const InputBar = memo(function InputBar({
   retryFileUpload,
   toggleCommandMenu, stop, t,
   renderSlot, useBusyEnter, useFileUploads, useNotices, useLexicon, useMenuLauncher, useStopShortcut, useContextMeter,
-  useComposerControlsBelow,
   useProjection, sessionId, variant, disabled: inert = false, blocked,
   workspacePickerOpen = false, onRequestWorkspace,
   placeholder, accessory,
@@ -58,7 +57,6 @@ export const InputBar = memo(function InputBar({
   const busyEnter = useBusyEnter(s => s)
   const stopKeys = useStopShortcut(keys => keys)
   const contextMeter = useContextMeter(visible => visible)
-  const controlsBelow = useComposerControlsBelow(below => below)
   void useLexicon // hook seat stays bound by the inject compartment; text-ref decoration rides the shell's editor transforms
   const commandMenuOpen = useMenuLauncher(source => source === 'command')
   const [activity, setActivity] = useState(false)
@@ -374,21 +372,6 @@ export const InputBar = memo(function InputBar({
         ? t('placeholder.steerQueue')
         : planActive ? t('placeholder.plan') : t('placeholder.default'))
 
-  // The setting seats render in the card's toolbar row, or in their own row
-  // below the card while a plugin holds `placeComposerControlsBelow()`.
-  const modes = () => (
-    <div className={css.modes}>
-      {sessionId === undefined ? null : renderSlot('conversation.input.permission', { locked })}
-      {sessionId === undefined ? null : renderSlot('conversation.input.plan', { locked })}
-    </div>
-  )
-  const settings = () => sessionId === undefined ? null : (
-    <>
-      {renderSlot('conversation.input.model', { locked: modelSeatLocked })}
-      {renderSlot('conversation.input.status', {})}
-    </>
-  )
-
   return (
     <div className={clsx(css.root, variant === 'hero' && css.hero)}>
       {toast !== null && (
@@ -478,7 +461,10 @@ export const InputBar = memo(function InputBar({
               hidden
               onChange={onPickFiles}
             />
-            {controlsBelow ? null : modes()}
+            <div className={css.modes}>
+              {sessionId === undefined ? null : renderSlot('conversation.input.permission', { locked })}
+              {sessionId === undefined ? null : renderSlot('conversation.input.plan', { locked })}
+            </div>
             {input === undefined || sessionId === undefined
               ? null
               : renderSlot('conversation.input.left', {})}
@@ -488,7 +474,8 @@ export const InputBar = memo(function InputBar({
               {input === undefined || sessionId === undefined
                 ? null
                 : renderSlot('conversation.input.right', {})}
-              {controlsBelow ? null : settings()}
+              {sessionId === undefined ? null : renderSlot('conversation.input.model', { locked: modelSeatLocked })}
+              {sessionId === undefined ? null : renderSlot('conversation.input.status', {})}
             </div>
             {input === undefined || sessionId === undefined ? null : <div className={activity ? css.activityExpanded : css.activity}>
               {renderSlot('conversation.input.activity', { locked, onActiveChange: setActivity })}
@@ -532,12 +519,6 @@ export const InputBar = memo(function InputBar({
           </div>
         </div>
       </div>
-      {controlsBelow && sessionId !== undefined && (
-        <div className={css.controlsBelow} data-composer-controls>
-          {modes()}
-          <div className={css.controlsBelowEnd}>{settings()}</div>
-        </div>
-      )}
       <div className={css.dock} data-composer-dock>
         {variant === 'composer' && input !== undefined && sessionId !== undefined
           ? renderSlot('conversation.composer.dock', {})

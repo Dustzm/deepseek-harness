@@ -465,29 +465,6 @@ describe('Conversation registries', () => {
     expect(uiConversation.contextMeter.getSnapshot()).toBe(true)
   })
 
-  it('places the composer setting controls below the card while any caller holds a claim', async () => {
-    const { ctx, uiConversation } = await bootRegistries()
-    const below = uiConversation.composerControlsBelow
-    const listener = vi.fn()
-    const unsubscribe = below.subscribe(listener)
-    expect(below.getSnapshot()).toBe(false)
-
-    const feature = ctx.inject(['uiConversation'], (featureCtx) => {
-      featureCtx.uiConversation.placeComposerControlsBelow()
-    })
-    await feature.await()
-    const release = uiConversation.placeComposerControlsBelow()
-    expect(below.getSnapshot()).toBe(true)
-
-    release()
-    release()
-    expect(below.getSnapshot()).toBe(true)
-    await feature.dispose()
-    expect(below.getSnapshot()).toBe(false)
-    expect(listener).toHaveBeenCalled()
-    unsubscribe()
-  })
-
   it('coalesces one turn of registry changes into one rebuild per resident Conversation', async () => {
     const { uiConversation, binding, events, views } = await bootRegistries()
     uiConversation.binding(binding)

@@ -537,8 +537,6 @@ export interface ComposerBarInjected {
     menuLauncher: ObservableSnapshot<string | null>
     /** Live visibility of the context-occupancy button below the input card (`uiConversation.claimContextMeter`). */
     contextMeter: ObservableSnapshot<boolean>
-    /** Whether the setting controls sit in a row below the input card (`uiConversation.placeComposerControlsBelow`). */
-    composerControlsBelow: ObservableSnapshot<boolean>
   }
 }
 
