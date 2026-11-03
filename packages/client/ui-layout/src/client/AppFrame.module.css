@@ -3,8 +3,18 @@
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   height: 100%;
+  box-sizing: border-box;
   overflow: hidden;
-  background: var(--dsw-alias-bg-base);
+  /* Content surface: a deployment may set --dsh-frame-content-inset to lift
+     the centre and right columns off --dsh-frame-canvas as one rounded
+     surface; the sidebar column stays full height on the canvas. Unset
+     values keep the flat three-column frame. */
+  padding:
+    var(--dsh-frame-content-inset, 0px)
+    var(--dsh-frame-content-inset, 0px)
+    var(--dsh-frame-content-inset, 0px)
+    0;
+  background: var(--dsh-frame-canvas, var(--dsw-alias-bg-base));
 }
 
 /* Only a discrete collapse/expand toggle eases the tracks (the TSX holds
@@ -57,9 +67,11 @@
 
 .sidebarCol {
   min-width: 0;
+  /* Reaches through the frame's content inset to the window edges. */
+  margin-block: calc(-1 * var(--dsh-frame-content-inset, 0px));
   overflow: hidden;
-  background: var(--dsw-specific-sidebar-fill);
-  border-right: 0.5px solid var(--dsw-alias-border-l3);
+  background: var(--dsh-frame-sidebar-fill, var(--dsw-specific-sidebar-fill));
+  border-right: var(--dsh-frame-sidebar-rule, 0.5px solid var(--dsw-alias-border-l3));
 }
 
 .centerCol {
@@ -67,6 +79,16 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: var(--dsw-alias-bg-base);
+  border-radius: var(--dsh-frame-content-radius, 0px);
+  box-shadow: var(--dsh-frame-content-shadow, none);
+}
+
+/* A right track continues the surface: the right panel owns the trailing
+   corners (ui-sidebar-right reads the same radius). */
+.frame:not([data-rightbar-collapsed]) .centerCol {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
 }
 
 /* macOS desktop: the frame goes transparent so window vibrancy reaches the
@@ -237,6 +259,12 @@
    and while dragging. */
 .frame[data-animating] .handle {
   transition: left var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+}
+
+/* The inline left is measured from the frame's border box; the right track
+   ends one content inset before it. */
+.handle[data-side='rightbar'] {
+  translate: calc(-1 * var(--dsh-frame-content-inset, 0px)) 0;
 }
 
 .frame[data-dragging] .handle {

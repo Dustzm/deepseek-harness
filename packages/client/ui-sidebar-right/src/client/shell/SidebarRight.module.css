@@ -71,6 +71,18 @@
   --dsh-dockkit-dock-layer: 40;
 }
 
+/* On a framed content surface (ui-layout --dsh-frame-content-*) the normal
+   panel closes the surface's trailing corners and, while open, draws its
+   edge. Unset tokens leave the square, edgeless panel. */
+.panel:not([data-sidebar-right-panel='fullscreen']) {
+  border-start-end-radius: var(--dsh-frame-content-radius, 0px);
+  border-end-end-radius: var(--dsh-frame-content-radius, 0px);
+}
+
+.panel[data-sidebar-right-open]:not([data-sidebar-right-panel='fullscreen']) {
+  box-shadow: var(--dsh-frame-content-shadow, none);
+}
+
 /* No whole-box subtraction here: Electron drag regions are window geometry,
    not stacking, so a strip row inside this fullscreen content that marks itself
    `data-window-drag` (ui-dockkit) still owns the drag over its own box, and

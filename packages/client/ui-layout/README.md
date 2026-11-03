@@ -42,6 +42,10 @@ Windows Electron's `data-windows-titlebar` marker reserves the caption height ab
 
 The root publishes `--dsh-frame-top-clearance` for the reserved strip (48px on macOS, the caption height on Windows), and `--dsh-frame-overlay-top` adds 20px for dialogs and menus. Native fullscreen reduces the overlay inset to 20px; dialogs retain their own 24px minimum. `--dsh-frame-chrome-top` excludes the Windows caption from modal mask painting and becomes zero in fullscreen. The full-viewport modal layer still blocks background clicks. Plain browser documents publish none of these values.
 
+### Content surface
+
+A deployment can lift the centre and right columns off the window background as one rounded surface by setting theme tokens the frame reads: `--dsh-frame-content-inset` pads the frame's top, right, and bottom edges, `--dsh-frame-canvas` paints the frame behind the surface, `--dsh-frame-content-radius` rounds the centre column (its trailing corners stay square while the right column has a track, and the right panel takes them), and `--dsh-frame-content-shadow` draws its edge. The sidebar column keeps full window height through the inset; `--dsh-frame-sidebar-fill` and `--dsh-frame-sidebar-rule` replace its fill and right border. Unset tokens keep the flat three-column frame, and the right resize handle stays on the right column's edge for any inset.
+
 ### Theme presentation
 
 The presenter consumes resolved theme snapshots and projects them onto the document: `html { color-scheme }` for native UA chrome, `body[data-ds-dark-theme]` from the active color scheme, the theme's alias tokens, `--dsh-content-font-size`, `--dsh-code-font-size`, `--dsh-terminal-font-size`, and each non-empty `--dsh-font-family-<role>` list as inline variables on body, and one owned `<meta name="theme-color">` whose content follows the computed body background. Disposing the presenter removes its metadata node with its other global writes.

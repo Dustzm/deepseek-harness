@@ -16,6 +16,7 @@
 | 启动页品牌：构建期变量 `DSH_CLIENT_BOOT_MARK`、`DSH_CLIENT_BOOT_MARK_DARK`、`DSH_CLIENT_BOOT_HINT` 写成页面元数据，启动页据此用指定标志取代字标与 spinner、替换或隐藏提示 | 桌面壳（产品身份） | `apps/web/product-identity.ts`、`packages/client/web`（`boot-page.ts` 与样式、测试、中英 README）、`docs/development.md` 中英 | 启动页写死「HARNESS」字标与英文提示，在插件加载前绘制，插件改不了；未设置时启动页不变 | 上游提供等价的启动页品牌接口后可去掉 |
 | 输入框上下文占用按钮可被认领：`ctx.uiConversation.claimContextMeter()` | 通用扩展接口 | `packages/client/ui-conversation`（`conversation/assembly.ts`、`apply.ts`、`contract/slots.ts`、`InputBar.tsx`、测试、中英 README） | 占用按钮写死在输入卡片下方、不经扩展位，浏览器端插件也拿不到 cordis.yml 的配置，下游把占用率放进别的控件（如模型选择器右侧的 `conversation.input.activity`）时无法去掉原按钮；认领随调用方 fiber 释放，没有认领时行为不变 | 上游提供等价接口或把按钮改为扩展位条目后可去掉 |
 | 输入框模型选择器右侧的状态扩展位 `conversation.input.status` | 通用扩展接口 | `packages/client/ui-conversation`（`contract/slots.ts`、`apply.ts`、`InputBar.tsx`、测试、中英 README） | 模型选择器与发送键之间只有 single 的 `conversation.input.activity`，它是可展开整条工具栏的活动位，下游的占用率之类状态读数放进去会与真正的活动占用方冲突；新增 list 扩展位，活动展开时与辅助控件一起隐藏，空列表时布局不变 | 上游提供等价扩展位后可去掉 |
+| 布局内容面 token：`--dsh-frame-content-inset`、`--dsh-frame-canvas`、`--dsh-frame-content-radius`、`--dsh-frame-content-shadow`、`--dsh-frame-sidebar-fill`、`--dsh-frame-sidebar-rule` | 通用扩展接口 | `packages/client/ui-layout`（`AppFrame.module.css`、中英 README）、`packages/client/ui-sidebar-right`（`SidebarRight.module.css`、中英 README） | 三栏框架的底色、侧栏边线与中栏形状写死在 CSS Module 里，下游无法把会话区与右侧面板做成浮在窗口底色上的圆角内容面；变量未设置时布局不变 | 上游提供等价主题接口后可去掉 |
 
 ## 核心仓库如何使用这些改动
 
