@@ -37,6 +37,7 @@ Use `ctx.sessionQuery` from application code when you need to read or search ses
 | `filterEvents(id, filters)` | Semantic event documents matching metadata and literal-text predicates |
 | `readTitleSnapshots(ids)` | The latest folded title per session, bound to its source header |
 | `listEvents(id)` / `readSurface(id)` | Lightweight per-event records, or the complete current model surface |
+| `projectSurfaces(ids, project)` | One caller-defined value per session, folded from borrowed current-surface events with at most one persistence listing for the whole batch |
 | `readEvent(request)` | One full event plus a bounded raw-log window around it |
 | `traceSession(id)` | The known ancestor chain and recursive descendant trees |
 | `traceEvent(request)` | One event's positional replacements and cited source-event relationships |
@@ -148,7 +149,7 @@ These limits define when this package is a poor fit or needs special operational
 
 - **No caller authorization** — this is trusted context-wide infrastructure; a model tool or UI must constrain which sessions its caller may inspect.
 - **No provider coordinator or fallback** — the service is abstract over search, so a composition must mount a concrete backend; there is no search-provider registry or fallback implementation.
-- **Exact reads replay whole logs** — `readSession`, `readSurface`, `filterEvents`, and event traces load and validate the complete logical log, so very large histories pay full inspection per call; `listSessions` stays lightweight.
+- **Exact reads replay whole logs** — `readSession`, `readSurface`, `filterEvents`, and event traces load and validate the complete logical log, so very large histories pay full inspection per call; `listSessions` stays lightweight. Reading many surfaces through `projectSurfaces` shares one persistence listing and copies no events, but still inspects every requested log.
 - **Literal text scan, not full-text search** — the `text` filter scans extracted documents with a regular expression and does not rank; ranked search requires the mounted backend.
 
 <a id="dev-note"></a>

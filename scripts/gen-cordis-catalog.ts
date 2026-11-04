@@ -209,6 +209,8 @@ export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
   sidebarRight: 'client-side right-Sidebar navigation face — packages/client/ui-sidebar-right/README.md owns the API',
   sidebarRightTabs: 'client-side right-Sidebar tab-type registry — packages/client/ui-sidebar-right/README.md owns the API',
   documentPreviews: 'client-side document renderer registry — docs/subsystems/sidebar-right.md owns the API',
+  uiPermission: 'client-side permission-control presentation service — packages/client/ui-permission-presets/README.md owns the API',
+  settingsNavigation: 'client-side settings-shell navigation service — packages/client/ui-settings-general/README.md owns the API',
 }
 
 /**
@@ -452,6 +454,8 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   ToolCallId: 'core.md',
   SessionLogSnapshot: 'session-query.md',
   SessionSurfaceSnapshot: 'session-query.md',
+  SessionSurfaceSource: 'session-query.md',
+  SessionSurfaceProjectionResult: 'session-query.md',
   ApprovalOutcome: 'approval.md',
   ApprovalPolicy: 'approval.md',
   ApprovalRequest: 'approval.md',

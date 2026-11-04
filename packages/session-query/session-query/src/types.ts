@@ -47,6 +47,33 @@ export interface SessionSurfaceSnapshot {
   events: SurfaceEvent[]
 }
 
+/** Borrowed current-surface source passed to one synchronous batch projection. */
+export interface SessionSurfaceSource {
+  /** Header selected from the same corpus observation as `events`; borrowed, so clone any retained part. */
+  readonly session: SessionHeader
+  /** Current surface events in model-history order; borrowed and valid only during the projection call. */
+  readonly events: readonly SurfaceEvent[]
+}
+
+/** One ordered result from a batch current-surface projection. */
+export type SessionSurfaceProjectionResult<Value> =
+  | {
+    /** Requested session id. */
+    sessionId: SessionId
+    /** Successful projection of one logical source. */
+    status: 'fulfilled'
+    /** Value returned by the projection. */
+    value: Value
+  }
+  | {
+    /** Requested session id. */
+    sessionId: SessionId
+    /** Operational failure isolated to this session. */
+    status: 'rejected'
+    /** Original failure from logical-source resolution, surface validation, or the projection. */
+    reason: unknown
+  }
+
 /** One validated detached observation of a logical session's complete raw log. */
 export interface SessionLogSnapshot {
   /** Cloned session header selected from the same observation as `events`. */

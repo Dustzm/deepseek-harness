@@ -37,6 +37,7 @@ kind: "package-reference"
 | `filterEvents(id, filters)` | 匹配元数据与字面文本谓词的语义事件文档 |
 | `readTitleSnapshots(ids)` | 每个会话的最新折叠标题，绑定到其来源 header |
 | `listEvents(id)` / `readSurface(id)` | 轻量逐事件记录，或完整的当前模型表层 |
+| `projectSurfaces(ids, project)` | 每个会话一个由调用方定义的值，从借用的当前表层事件折叠得到；整批最多列举一次持久化 |
 | `readEvent(request)` | 一个完整事件加其周围有界的原始日志窗口 |
 | `traceSession(id)` | 已知祖先链与递归后代树 |
 | `traceEvent(request)` | 一个事件的位置替换与被引用源事件关系 |
@@ -148,7 +149,7 @@ kind: "package-reference"
 
 - **无调用方授权**——这是上下文范围内的可信基础设施；模型工具或 UI 必须限制调用方可检查的会话。
 - **无提供方协调器或回退**——服务在搜索上是抽象的，组合必须挂载具体后端；没有搜索提供方注册表或回退实现。
-- **精确读取回放整个日志**——`readSession`、`readSurface`、`filterEvents` 与事件追踪会加载并校验完整逻辑日志，因此非常大的历史每次调用都要付出完整检查；`listSessions` 保持轻量。
+- **精确读取回放整个日志**——`readSession`、`readSurface`、`filterEvents` 与事件追踪会加载并校验完整逻辑日志，因此非常大的历史每次调用都要付出完整检查；`listSessions` 保持轻量。经 `projectSurfaces` 批量读取多个表层时共用一次持久化列举且不复制事件，但仍会检查每个请求的日志。
 - **字面文本扫描，而非全文搜索**——`text` 过滤器用正则表达式扫描提取出的文档且不提供排名；带排名的搜索需要挂载后端。
 
 <a id="dev-note"></a>

@@ -47,6 +47,19 @@ export function currentSurfaceEvents(
   sessionId: SessionId,
   events: readonly SessionEvent[],
 ): SurfaceEvent[] {
+  return currentSurfaceEventRefs(sessionId, events).map(snapshotSessionEvent)
+}
+
+/**
+ * Fold the current model surface after validating the whole log, without copying events.
+ * @param sessionId - owner used in query diagnostics.
+ * @param events - raw event log from one corpus observation.
+ * @returns the elements of `events` that form the current surface, in folded order; they alias the input.
+ */
+export function currentSurfaceEventRefs(
+  sessionId: SessionId,
+  events: readonly SessionEvent[],
+): SurfaceEvent[] {
   const analysis = analyzeEventLog(sessionId, events)
   return analysis.currentSeqs.map((seq) => {
     const event = events[seq]
@@ -57,7 +70,7 @@ export function currentSurfaceEvents(
         'SESSION_QUERY_INVALID_SURFACE',
       )
     }
-    return snapshotSessionEvent(event)
+    return event
   })
 }
 

@@ -57,6 +57,39 @@ interface SessionSurfaceSnapshot {
 }
 ```
 
+`projectSurfaces` 把每个会话的 `SessionSurfaceSource` 交给调用方的同步投影函数，而不是返回副本，因此搜索索引这类批量读取方只保留自己构建的值。结果与批量标题读取遵循同一套按 id 的规则。
+
+```ts type-equiv
+/** Borrowed current-surface source passed to one synchronous batch projection. */
+interface SessionSurfaceSource {
+  /** Header selected from the same corpus observation as `events`; borrowed, so clone any retained part. */
+  readonly session: SessionHeader
+  /** Current surface events in model-history order; borrowed and valid only during the projection call. */
+  readonly events: readonly SurfaceEvent[]
+}
+```
+
+```ts type-equiv
+/** One ordered result from a batch current-surface projection. */
+type SessionSurfaceProjectionResult<Value> =
+  | {
+    /** Requested session id. */
+    sessionId: SessionId
+    /** Successful projection of one logical source. */
+    status: 'fulfilled'
+    /** Value returned by the projection. */
+    value: Value
+  }
+  | {
+    /** Requested session id. */
+    sessionId: SessionId
+    /** Operational failure isolated to this session. */
+    status: 'rejected'
+    /** Original failure from logical-source resolution, surface validation, or the projection. */
+    reason: unknown
+  }
+```
+
 `SessionTitleObservation` 将同样的原子观测规则应用于标题折叠，使执行授权检查的消费方能够验证提供标题的源 header。批量读取会按顺序为每个唯一请求 id 返回一个 `SessionTitleObservationResult`：操作失败只影响对应 id，而取消会拒绝整个操作。
 
 ```ts type-equiv
@@ -473,10 +506,27 @@ async filterEvents( sessionId: SessionId, filters: readonly SessionEventResultFi
 /**
  * Read one session's complete current model surface from one corpus observation.
  * @param sessionId - live-preferred session id to read.
+ * @param signal - optional cancellation for persisted source resolution.
  * @returns cloned header, current surface, and the last sequence number included in the raw-log capture.
  * @throws when source resolution fails or the session surface is invalid.
  */
-async readSurface(sessionId: SessionId): Promise<SessionSurfaceSnapshot>
+async readSurface(sessionId: SessionId, signal?: AbortSignal): Promise<SessionSurfaceSnapshot>
+
+/**
+ * Project the current model surface of unique sessions from one cancellable corpus observation.
+ *
+ * The whole batch lists persistence at most once and never lists it when
+ * every id is live. Persisted inspections run with `persistedReadConcurrency`
+ * workers, and each log is projected and released before its worker claims
+ * another id. Results preserve first-occurrence input order. Resolution,
+ * surface-validation, and projection failures stay isolated per session,
+ * while cancellation rejects the complete operation.
+ * @param sessionIds - live or persisted session ids to observe.
+ * @param project - synchronous fold over borrowed events; it must clone every value it retains.
+ * @param signal - optional cancellation shared by listing and every persisted inspection.
+ * @returns one fulfilled or rejected result per unique requested id.
+ */
+async projectSurfaces<Value>( sessionIds: readonly SessionId[], project: (source: SessionSurfaceSource) => Value, signal?: AbortSignal, ): Promise<SessionSurfaceProjectionResult<Value>[]>
 
 /**
  * Trace known ancestry and descendants from one corpus observation.

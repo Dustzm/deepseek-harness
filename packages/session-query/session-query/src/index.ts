@@ -33,7 +33,9 @@ import type {
   SessionSearchHit,
   SessionSearchPage,
   SessionSearchRequest,
+  SessionSurfaceProjectionResult,
   SessionSurfaceSnapshot,
+  SessionSurfaceSource,
   SessionTitleObservation,
   SessionTitleObservationResult,
 } from './types.ts'
@@ -304,17 +306,44 @@ export abstract class SessionQueryEngine extends Service {
   /**
    * Read one session's complete current model surface from one corpus observation.
    * @param sessionId - live-preferred session id to read.
+   * @param signal - optional cancellation for persisted source resolution.
    * @returns cloned header, current surface, and the last sequence number included in the raw-log capture.
    * @throws when source resolution fails or the session surface is invalid.
    */
-  async readSurface(sessionId: SessionId): Promise<SessionSurfaceSnapshot> {
-    const loaded = await this._corpus.load(sessionId)
+  async readSurface(sessionId: SessionId, signal?: AbortSignal): Promise<SessionSurfaceSnapshot> {
+    const loaded = await this._corpus.load(sessionId, signal)
+    signal?.throwIfAborted()
     return {
       session: structuredClone(loaded.header),
       inheritedEventCount: loaded.inheritedEventCount,
       capturedThroughSeq: loaded.events.at(-1)?.seq ?? null,
       events: tracing.currentSurfaceEvents(sessionId, loaded.events),
     }
+  }
+
+  /**
+   * Project the current model surface of unique sessions from one cancellable corpus observation.
+   *
+   * The whole batch lists persistence at most once and never lists it when
+   * every id is live. Persisted inspections run with `persistedReadConcurrency`
+   * workers, and each log is projected and released before its worker claims
+   * another id. Results preserve first-occurrence input order. Resolution,
+   * surface-validation, and projection failures stay isolated per session,
+   * while cancellation rejects the complete operation.
+   * @param sessionIds - live or persisted session ids to observe.
+   * @param project - synchronous fold over borrowed events; it must clone every value it retains.
+   * @param signal - optional cancellation shared by listing and every persisted inspection.
+   * @returns one fulfilled or rejected result per unique requested id.
+   */
+  async projectSurfaces<Value>(
+    sessionIds: readonly SessionId[],
+    project: (source: SessionSurfaceSource) => Value,
+    signal?: AbortSignal,
+  ): Promise<SessionSurfaceProjectionResult<Value>[]> {
+    return this._corpus.projectMany(sessionIds, source => project({
+      session: source.header,
+      events: tracing.currentSurfaceEventRefs(source.header.id, source.events),
+    }), signal)
   }
 
   /**

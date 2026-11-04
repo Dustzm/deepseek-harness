@@ -57,6 +57,39 @@ interface SessionSurfaceSnapshot {
 }
 ```
 
+`projectSurfaces` hands each session's `SessionSurfaceSource` to a synchronous caller projection instead of returning copies, so a batch reader such as a search index keeps only the values it builds. Results follow the same per-id rule as batch title reads.
+
+```ts type-equiv
+/** Borrowed current-surface source passed to one synchronous batch projection. */
+interface SessionSurfaceSource {
+  /** Header selected from the same corpus observation as `events`; borrowed, so clone any retained part. */
+  readonly session: SessionHeader
+  /** Current surface events in model-history order; borrowed and valid only during the projection call. */
+  readonly events: readonly SurfaceEvent[]
+}
+```
+
+```ts type-equiv
+/** One ordered result from a batch current-surface projection. */
+type SessionSurfaceProjectionResult<Value> =
+  | {
+    /** Requested session id. */
+    sessionId: SessionId
+    /** Successful projection of one logical source. */
+    status: 'fulfilled'
+    /** Value returned by the projection. */
+    value: Value
+  }
+  | {
+    /** Requested session id. */
+    sessionId: SessionId
+    /** Operational failure isolated to this session. */
+    status: 'rejected'
+    /** Original failure from logical-source resolution, surface validation, or the projection. */
+    reason: unknown
+  }
+```
+
 `SessionTitleObservation` applies the same atomic-observation rule to title folding, so an authorization consumer can validate the source header that supplied the title. Batch reads return one ordered `SessionTitleObservationResult` per unique requested id: operational failures remain local to that id, while cancellation rejects the complete operation.
 
 ```ts type-equiv
@@ -473,10 +506,27 @@ async filterEvents( sessionId: SessionId, filters: readonly SessionEventResultFi
 /**
  * Read one session's complete current model surface from one corpus observation.
  * @param sessionId - live-preferred session id to read.
+ * @param signal - optional cancellation for persisted source resolution.
  * @returns cloned header, current surface, and the last sequence number included in the raw-log capture.
  * @throws when source resolution fails or the session surface is invalid.
  */
-async readSurface(sessionId: SessionId): Promise<SessionSurfaceSnapshot>
+async readSurface(sessionId: SessionId, signal?: AbortSignal): Promise<SessionSurfaceSnapshot>
+
+/**
+ * Project the current model surface of unique sessions from one cancellable corpus observation.
+ *
+ * The whole batch lists persistence at most once and never lists it when
+ * every id is live. Persisted inspections run with `persistedReadConcurrency`
+ * workers, and each log is projected and released before its worker claims
+ * another id. Results preserve first-occurrence input order. Resolution,
+ * surface-validation, and projection failures stay isolated per session,
+ * while cancellation rejects the complete operation.
+ * @param sessionIds - live or persisted session ids to observe.
+ * @param project - synchronous fold over borrowed events; it must clone every value it retains.
+ * @param signal - optional cancellation shared by listing and every persisted inspection.
+ * @returns one fulfilled or rejected result per unique requested id.
+ */
+async projectSurfaces<Value>( sessionIds: readonly SessionId[], project: (source: SessionSurfaceSource) => Value, signal?: AbortSignal, ): Promise<SessionSurfaceProjectionResult<Value>[]>
 
 /**
  * Trace known ancestry and descendants from one corpus observation.
