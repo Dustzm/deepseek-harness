@@ -106,7 +106,7 @@ function mountShell({ collapsed = false, width = 300, shortcuts = [] }: {
 describe('SidebarRoot shell', () => {
   it('advertises the effective new-session binding', () => {
     const shortcut: ShortcutCatalogEntry = { id: 'session.new' as ShortcutCommandId, label: 'New', aliases: [],
-      binding: null, modified: true, conflicts: [], issue: null, keys: ['Ctrl', 'N'], aria: 'Control+N' }
+      binding: null, modified: true, conflicts: [], issue: null, overridden: false, keys: ['Ctrl', 'N'], aria: 'Control+N' }
     mountShell({ shortcuts: [shortcut] })
     for (const button of screen.getAllByRole('button', { name: 'New session' })) {
       expect(button.getAttribute('aria-keyshortcuts')).toBe('Control+N')
@@ -297,7 +297,7 @@ it('wires the shell.leading controls to the shared sidebar actions', () => {
   const startSession = vi.fn()
   const trackEntryClick = vi.fn<HeaderLeadingControlsProps['trackEntryClick']>()
   // This occupant only consumes its actions and locale, not Session hooks.
-  const props = { toggleSidebar, startSession, trackEntryClick, t, useShortcuts: select => select([{ id: 'sidebar.left.toggle' as ShortcutCommandId, label: 'Toggle sidebar', aliases: [], binding: null, modified: false, conflicts: [], issue: null, keys: ['⌘', 'B'], aria: 'Meta+B' }]) } as HeaderLeadingControlsProps
+  const props = { toggleSidebar, startSession, trackEntryClick, t, useShortcuts: select => select([{ id: 'sidebar.left.toggle' as ShortcutCommandId, label: 'Toggle sidebar', aliases: [], binding: null, modified: false, conflicts: [], issue: null, overridden: false, keys: ['⌘', 'B'], aria: 'Meta+B' }]) } as HeaderLeadingControlsProps
   render(<HeaderLeadingControls {...props} />)
   fireEvent.click(screen.getByRole('button', { name: en['toggle.open'] }))
   expect(toggleSidebar).toHaveBeenCalledOnce()
@@ -370,7 +370,7 @@ describe('Windows caption tooltips', () => {
 })
 
 it('uses the same effective sidebar binding for hover/focus hints and ARIA', () => {
-  const shortcut = { id: 'sidebar.left.toggle' as ShortcutCommandId, label: 'Toggle sidebar', aliases: [], binding: null, modified: false, conflicts: [], issue: null, keys: ['⌘', 'B'], aria: 'Meta+B' }
+  const shortcut = { id: 'sidebar.left.toggle' as ShortcutCommandId, label: 'Toggle sidebar', aliases: [], binding: null, modified: false, conflicts: [], issue: null, overridden: false, keys: ['⌘', 'B'], aria: 'Meta+B' }
   mountShell({ shortcuts: [shortcut] })
   const toggle = screen.getByRole('button', { name: en['toggle.collapse'] })
   expect(toggle.getAttribute('aria-keyshortcuts')).toBe('Meta+B')

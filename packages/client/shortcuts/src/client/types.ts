@@ -41,6 +41,16 @@ export interface ShortcutCatalogEntry {
   readonly modified: boolean
   readonly conflicts: readonly ShortcutCommandId[]
   readonly issue: BindingIssue | null
+  /** Whether another plugin currently overrides the command's action; the owner omits the keys beside its own local controls while true. */
+  readonly overridden: boolean
+}
+/** Options for one command takeover. */
+export interface ShortcutOverrideOptions {
+  /**
+   * Extra modal identifiers accepted while this takeover resolves the command, merged with the command's own `modals`;
+   * Windows/macOS Desktop keyboard bindings still take priority over modal state.
+   */
+  readonly modals?: readonly string[]
 }
 /** Keyboard adapter input, with composition and local consumption already resolved. */
 export interface ShortcutGesture {
@@ -137,10 +147,12 @@ export interface Shortcuts {
   register(command: ShortcutCommand): () => void
   /**
    * Take over a registered command's action; its id, labels, defaults, saved binding, regions, and modals are unchanged.
-   * Mount order is free: the most recent mounted takeover resolves the command, and disposal restores the previous one.
+   * Mount order is free: the most recent mounted takeover resolves the command and supplies the extra modals,
+   * and disposal restores the previous one. Mounting and disposal republish the catalog with `overridden` updated.
    * @param id - command whose action is replaced.
    * @param resolve - replacement target resolver.
+   * @param options - extra modals in which this takeover may run.
    * @returns idempotent disposer restoring the previous resolver.
    */
-  override(id: ShortcutCommandId, resolve: ShortcutCommand['resolve']): () => void
+  override(id: ShortcutCommandId, resolve: ShortcutCommand['resolve'], options?: ShortcutOverrideOptions): () => void
 }

@@ -3,7 +3,13 @@ import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { bindingIssue, bindingKey, effectiveShortcuts, initialShortcutConfig, isWebBindingAllowed, normalizeBinding, overlappingBindings, presentBinding, resolveShortcutDefault } from '../protocol.ts'
 import type { ShortcutCommandId, ShortcutConfigSnapshot, ShortcutDefinition, ShortcutPlatform, ShortcutRuntime } from '../protocol.ts'
 import type { ShortcutCatalogEntry, ShortcutCommand, ShortcutContext, ShortcutGesture,
-  ShortcutFixedCommand, ShortcutFixedCatalogEntry } from './types.ts'
+  ShortcutFixedCommand, ShortcutFixedCatalogEntry, ShortcutOverrideOptions } from './types.ts'
+
+/** One mounted takeover layer, removed by reference. */
+interface ShortcutTakeover {
+  readonly resolve: ShortcutCommand['resolve']
+  readonly modals: readonly string[]
+}
 
 /** Dispatch consumption is independent of later business-operation success. */
 type ShortcutDispatch = { status: 'handled'; commandId: ShortcutCommandId }
@@ -17,7 +23,7 @@ export class ShortcutRegistry {
   private readonly conflicts = new Map<string, ShortcutCommand>()
   private readonly bindings = new Map<string, ShortcutCommand>()
   /** Action takeovers by command id; the most recent mounted entry resolves the command. */
-  private readonly overrides = new Map<ShortcutCommandId, ShortcutCommand['resolve'][]>()
+  private readonly overrides = new Map<ShortcutCommandId, ShortcutTakeover[]>()
   private readonly state
   /** Effective localized rows derived from the accepted configuration. */
   readonly catalog
@@ -113,27 +119,38 @@ export class ShortcutRegistry {
 
   /**
    * Take over a command's action while its id, labels, defaults, saved binding, regions, and modals stay with the owner.
-   * The takeover may mount before or after the command; the most recent mounted takeover resolves it.
+   * The takeover may mount before or after the command; the most recent mounted takeover resolves it and adds its modals.
    * @param id - command whose action is replaced.
    * @param resolve - replacement target resolver.
+   * @param options - extra modals accepted while this takeover is the most recent one.
    * @returns idempotent disposer restoring the previous resolver.
    */
-  override(id: ShortcutCommandId, resolve: ShortcutCommand['resolve']): () => void {
+  override(id: ShortcutCommandId, resolve: ShortcutCommand['resolve'], options: ShortcutOverrideOptions = {}): () => void {
+    const layer: ShortcutTakeover = { resolve, modals: [...options.modals ?? []] }
     const stack = this.overrides.get(id) ?? []
-    stack.push(resolve)
+    stack.push(layer)
     this.overrides.set(id, stack)
+    this.refreshLabels()
     return () => {
       const current = this.overrides.get(id)
-      const index = current?.lastIndexOf(resolve) ?? -1
+      const index = current?.indexOf(layer) ?? -1
       if (current === undefined || index === -1) return
       current.splice(index, 1)
       if (current.length === 0) this.overrides.delete(id)
+      this.refreshLabels()
     }
   }
 
+  private takeover(id: ShortcutCommandId): ShortcutTakeover | undefined {
+    return this.overrides.get(id)?.at(-1)
+  }
+
+  private allowsModal(command: ShortcutCommand, modal: string | null): boolean {
+    return modal === null || command.modals.includes(modal) || this.takeover(command.id)?.modals.includes(modal) === true
+  }
+
   private resolve(command: ShortcutCommand, context: ShortcutContext): ReturnType<ShortcutCommand['resolve']> {
-    const takeover = this.overrides.get(command.id)?.at(-1)
-    return (takeover ?? command.resolve)(context)
+    return (this.takeover(command.id)?.resolve ?? command.resolve)(context)
   }
 
   /**
@@ -153,7 +170,8 @@ export class ShortcutRegistry {
       }
       return { ...row, label: command.label(), aliases: command.aliases,
         ...presentBinding(row.binding, this.platform),
-        aria: enabled ? presentBinding(row.binding, this.platform).aria : undefined }
+        aria: enabled ? presentBinding(row.binding, this.platform).aria : undefined,
+        overridden: this.overrides.has(row.id) }
     })
     this.state.set({ config, catalog })
     this.refreshFixedLabels()
@@ -166,7 +184,7 @@ export class ShortcutRegistry {
    */
   invoke(id: ShortcutCommandId, context: ShortcutContext): void {
     const command = this.commands.get(id)
-    if (command === undefined || (context.modal !== null && !command.modals.includes(context.modal))) return
+    if (command === undefined || !this.allowsModal(command, context.modal)) return
     const result = this.resolve(command, { ...context, source: 'menu' })
     if (result.status === 'handled') result.run()
   }
@@ -193,7 +211,7 @@ export class ShortcutRegistry {
       consume()
       return { status: 'blocked', commandId: command.id, reason: 'conflict' }
     }
-    if (!priority && context.modal !== null && !command.modals.includes(context.modal)) {
+    if (!priority && !this.allowsModal(command, context.modal)) {
       consume()
       return { status: 'blocked', commandId: command.id, reason: 'modal' }
     }

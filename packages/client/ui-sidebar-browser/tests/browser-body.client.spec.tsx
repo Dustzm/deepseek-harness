@@ -90,7 +90,7 @@ describe('BrowserBody', () => {
   it('displays the effective browser refresh accelerator', () => {
     const mounted = mountBrowser(undefined, { refreshShortcut: { id: 'page.refresh' as never,
       label: 'Refresh', aliases: [], binding: null, keys: ['Ctrl', 'R'], aria: 'Control+R',
-      modified: true, conflicts: [], issue: null } })
+      modified: true, conflicts: [], issue: null, overridden: false } })
     expect(mounted.view.getByRole('button', { name: zh.reload }).getAttribute('aria-keyshortcuts')).toBe('Control+R')
   })
   it('shows the saved title and URL without loading until Restore is clicked', async () => {

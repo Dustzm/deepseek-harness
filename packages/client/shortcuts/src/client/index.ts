@@ -5,15 +5,15 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import { ShortcutRegistry } from './registry.ts'
 import { detectEnvironment, installKeyboard } from './dom.ts'
 import { bindingIssue, initialShortcutConfig, normalizeBinding, overlappingBindings, presentBinding } from '../protocol.ts'
-import type { DesktopKeyboardApi, DesktopShortcutsApi, ShortcutSaveResult } from '../protocol.ts'
+import type { DesktopKeyboardApi, DesktopShortcutsApi, ShortcutCommandId, ShortcutSaveResult } from '../protocol.ts'
 import { desktopShortcutStorage, webShortcutStorage } from './storage.ts'
 import type { Shortcuts } from './types.ts'
-import type { ShortcutFixedInput } from './types.ts'
+import type { ShortcutCommand, ShortcutFixedInput, ShortcutOverrideOptions } from './types.ts'
 import { installNativeKeyboard } from './native.ts'
 import { Config } from '../config.ts'
 
 export type { ShortcutCatalogEntry, ShortcutCommand, ShortcutContext, ShortcutGesture, Shortcuts } from './types.ts'
-export type { ShortcutFixedInput, ShortcutFixedCommand, ShortcutFixedCatalogEntry } from './types.ts'
+export type { ShortcutFixedInput, ShortcutFixedCommand, ShortcutFixedCatalogEntry, ShortcutOverrideOptions } from './types.ts'
 export type { ShortcutBinding, ShortcutCommandId, ShortcutPlatform, ShortcutRuntime } from '../protocol.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -80,8 +80,12 @@ export default class ShortcutsService extends Service implements Shortcuts {
     return () => { off(); this.syncDefinitions() }
   }
 
-  override(...args: Parameters<Shortcuts['override']>): () => void {
-    return this.registry.override(...args)
+  override(
+    id: ShortcutCommandId,
+    resolve: ShortcutCommand['resolve'],
+    options?: ShortcutOverrideOptions,
+  ): () => void {
+    return this.registry.override(id, resolve, options)
   }
 
   registerFixed(command: Parameters<Shortcuts['registerFixed']>[0]): () => void {

@@ -890,7 +890,7 @@ describe('slot-owned useTabInfo', () => {
     const h = await mountSeat()
     const split: ShortcutCatalogEntry = {
       id: 'pane.split' as ShortcutCommandId, label: 'Split', aliases: [],
-      binding: { code: 'Backslash', modifiers: ['meta'] }, modified: false, conflicts: [], issue: null,
+      binding: { code: 'Backslash', modifiers: ['meta'] }, modified: false, conflicts: [], issue: null, overridden: false,
       keys: ['⌘', '\\'], aria: 'Meta+\\',
     }
     act(() => {
@@ -913,7 +913,7 @@ describe('slot-owned useTabInfo', () => {
   it('advertises configured pane and page-close controls', async () => {
     const h = await mountSeat()
     const entry = (id: string): ShortcutCatalogEntry => ({ id: id as ShortcutCommandId,
-      label: id, aliases: [], binding: null, modified: true, conflicts: [], issue: null,
+      label: id, aliases: [], binding: null, modified: true, conflicts: [], issue: null, overridden: false,
       keys: ['Ctrl', 'G'], aria: 'Control+G' })
     act(() => {
       h.catalog.set(['page.close', 'pane.fullscreen.toggle', 'sidebar.right.toggle'].map(entry))

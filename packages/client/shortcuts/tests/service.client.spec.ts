@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import ShortcutsService from '../src/client/index.ts'
+import { ShortcutRegistry } from '../src/client/registry.ts'
 import { initialShortcutConfig } from '../src/protocol.ts'
 import type { DesktopKeyboardApi, DesktopShortcutsApi, ShortcutConfigSnapshot, ShortcutCommandId } from '../src/protocol.ts'
 
@@ -172,6 +173,19 @@ it('persists Web edits and presents normalized bindings through the public servi
   expect((await service.edit({ type: 'set', id: command.id, binding: null }, service.config.getSnapshot().revision)).status).toBe('saved')
   expect(service.catalog.getSnapshot()[0]?.keys).toEqual([])
   await service.recording(true); off()
+})
+
+it('forwards takeover modals through the public service and publishes the overridden row', async () => {
+  const { service } = mount()
+  await vi.waitFor(() => { expect(service.config.getSnapshot().status).toBe('ready') })
+  service.register(command)
+  const forwarded = vi.spyOn(ShortcutRegistry.prototype, 'override')
+  const resolve = () => ({ status: 'pass' as const })
+  const release = service.override(command.id, resolve, { modals: ['palette'] })
+  expect(forwarded).toHaveBeenCalledExactlyOnceWith(command.id, resolve, { modals: ['palette'] })
+  expect(service.catalog.getSnapshot()[0]?.overridden).toBe(true)
+  release()
+  expect(service.catalog.getSnapshot()[0]?.overridden).toBe(false)
 })
 
 it('publishes fixed reservations to Desktop and reports their conflicts while their owner is mounted', () => {

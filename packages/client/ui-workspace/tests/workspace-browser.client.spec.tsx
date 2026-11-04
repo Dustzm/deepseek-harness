@@ -13,6 +13,7 @@ import type {
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
+import type { ShortcutCatalogEntry, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { DirectoryFlowOwnerProps, WorkspaceBrowserProps } from '../src/client/contract/slots.ts'
 import { createWorkspaceShortcutControls } from '../src/client/shortcuts.ts'
 import { createWorkspaceViewStore, FLAT_SESSION_ORDER_KEY } from '../src/client/stores.ts'
@@ -152,6 +153,18 @@ function rerender(b: ReturnType<typeof mount>, overrides: Partial<WorkspaceBrows
 }
 
 describe('WorkspaceBrowser', () => {
+  it.each([true, false])('omits the list search keys only while session.search is overridden (wide: %s)', (wide) => {
+    const row = (overridden: boolean): ShortcutCatalogEntry => ({
+      id: 'session.search' as ShortcutCommandId, label: 'Search', aliases: [], keys: ['⌘', 'K'], aria: 'Meta+K',
+      binding: { code: 'KeyK', modifiers: ['meta'] }, modified: false, conflicts: [], issue: null, overridden,
+    })
+    const b = mount({ wide, useShortcuts: select => select([row(false)]) })
+    const button = () => screen.getByRole('button', { name: '搜索会话' })
+    expect(button().getAttribute('aria-keyshortcuts')).toBe('Meta+K')
+    rerender(b, { useShortcuts: select => select([row(true)]) })
+    expect(button().hasAttribute('aria-keyshortcuts')).toBe(false)
+  })
+
   it.each(['workspace', 'flat', 'ungrouped'] as const)('keeps %s recency independent of arrival order and saved manual positions', (mode) => {
     localStorage.clear()
     const preferences = createWorkspaceViewStore().create()
