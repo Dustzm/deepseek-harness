@@ -204,8 +204,8 @@ export class PtcWorkflowRun implements WorkflowRun {
     const callId = ++this.started
     const run = await this.subagents.startActivation({
       provider: this.provider,
-      // The child Session takes the agent() display name (explicit label or the prompt's first line);
-      // a request without one uses the run name and call number.
+      // The child Session takes the agent() display name (explicit label, the prompt's first
+      // non-blank line, or the run name and agent number); a request without one uses the run name and call number.
       label: request.label ?? `${this.meta.name} child ${callId}`,
       delivery: 'caller',
       signal: this.controller.signal,

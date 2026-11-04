@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-在全新 Node 进程中按调用 Session 的文件沙箱策略运行 JavaScript 工作流。脚本保留 `agent()`、`parallel()`、`pipeline()`、`phase()` 和 `log()` 钩子，委派的工作由 subagent 完成。同一个执行提供方服务 PTC 与工作流，包括需显式启用的 Ralph 循环。运行没有整体经过时间截止；取消会停止受管进程并释放子 agent。所选沙箱与子进程提供方决定强制能力和清理限制。子会话在子智能体列表里的名字取 `agent()` 的显示名，与 `agent-start` 进度报告的名字相同：非空白的 `label`，否则取提示词第一个非空行（最多 48 个字符）。
+在全新 Node 进程中按调用 Session 的文件沙箱策略运行 JavaScript 工作流。脚本保留 `agent()`、`parallel()`、`pipeline()`、`phase()` 和 `log()` 钩子，委派的工作由 subagent 完成。同一个执行提供方服务 PTC 与工作流，包括需显式启用的 Ralph 循环。运行没有整体经过时间截止；取消会停止受管进程并释放子 agent。所选沙箱与子进程提供方决定强制能力和清理限制。子会话在子智能体列表里的名字取 `agent()` 的显示名，与 `agent-start` 进度报告的名字相同：非空白的 `label`，否则取提示词第一个非空行（最多 48 个字符），提示词全是空白时为 `<工作流名> child <序号>`。
 
 ## 目录
 

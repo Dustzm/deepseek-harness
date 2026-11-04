@@ -254,7 +254,7 @@ describe('workflow child results', () => {
     expect(test.requests.map(request => request.label)).toEqual([`${'x'.repeat(47)}…`, 'short'])
   })
 
-  it('names the child after the prompt when the label is blank or the prompt opens with blank lines', async () => {
+  it('names the child after the prompt when the label is blank or the prompt opens with blank lines, and after the run when the prompt is blank', async () => {
     const test = fixture(`
       await agent('hello', { label: '' })
       await agent('hello', { label: '  ' })
@@ -262,7 +262,7 @@ describe('workflow child results', () => {
       return await agent(${JSON.stringify(' \n ')})
     `)
     await expect(runWorkflowGuest(test.host)).resolves.toMatchObject({ stopReason: 'completed' })
-    const labels = ['hello', 'hello', 'indented first line', '']
+    const labels = ['hello', 'hello', 'indented first line', 'guest-test child 4']
     expect(test.requests.map(request => request.label)).toEqual(labels)
     expect(test.events.filter(event => event.type === 'agent-start').map(event => event.info.label)).toEqual(labels)
   })

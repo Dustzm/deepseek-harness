@@ -42,9 +42,10 @@ function outputText(blocks: ContentBlock[]): string {
     .join('')
 }
 
-/** A short display label from the prompt's first non-blank line, used when the script passes no label. */
-function defaultLabel(prompt: string): string {
-  const line = prompt.split('\n').find(candidate => candidate.trim() !== '')?.trim() ?? ''
+/** A short display label from the prompt's first non-blank line; `undefined` when every line is blank. */
+function promptLabel(prompt: string): string | undefined {
+  const line = prompt.split('\n').find(candidate => candidate.trim() !== '')?.trim()
+  if (line === undefined) return undefined
   return line.length <= 48 ? line : `${line.slice(0, 47)}…`
 }
 
@@ -60,6 +61,7 @@ export class WorkflowExecution {
   private currentPhase: string | undefined
   private readonly context: vm.Context
   private readonly compiled: vm.Script
+  private readonly name: string
 
   constructor(
     meta: WorkflowMeta,
@@ -69,6 +71,7 @@ export class WorkflowExecution {
     private readonly observer: ExecutionObserver,
     private readonly children: ChildPort,
   ) {
+    this.name = meta.name
     // The host parses this same wrapper before publishing a run.
     try {
       this.compiled = new vm.Script(`(async () => {\n${body}\n})()`, {
@@ -172,7 +175,7 @@ export class WorkflowExecution {
     }
     this.started += 1
     const seq = this.started
-    const label = opts.label ?? defaultLabel(rawPrompt)
+    const label = opts.label ?? promptLabel(rawPrompt) ?? `${this.name} child ${seq}`
     const phase = opts.phase ?? this.currentPhase
 
     await this.acquireSlot()

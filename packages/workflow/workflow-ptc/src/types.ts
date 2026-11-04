@@ -44,7 +44,10 @@ export interface ChildStartRequest {
   provider?: string
   /** The per-child model override, if the call passed one. */
   model?: string
-  /** Display name that names the child Session: the script's non-blank `agent()` label, otherwise the prompt's first non-blank line. */
+  /**
+   * Display name that names the child Session: the script's non-blank `agent()` label,
+   * otherwise the prompt's first non-blank line, otherwise `<workflow name> child <seq>`.
+   */
   label?: string
 }
 
