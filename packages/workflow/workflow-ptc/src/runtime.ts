@@ -185,6 +185,7 @@ export class WorkflowExecution {
           ...opts.schema !== undefined ? { schema: opts.schema } : {},
           ...opts.provider !== undefined ? { provider: opts.provider } : {},
           ...opts.model !== undefined ? { model: opts.model } : {},
+          ...opts.label !== undefined ? { label: opts.label } : {},
         })
       } catch (error: unknown) {
         throw new WorkflowError(`agent() could not start a child: ${renderThrown(error)}`, 'AGENT_START', { cause: error })

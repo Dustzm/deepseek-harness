@@ -184,6 +184,25 @@ describe('workflow host callback validation', () => {
 })
 
 describe('workflow runtime outcomes', () => {
+  it('names the child Session after an explicit agent() label', async () => {
+    const { ctx, start } = await setup(async (bindings) => {
+      const child = await bindings.startChild!({ prompt: 'answer', label: '调研·Rust' })
+      await bindings.disposeChild!(child)
+      return completed
+    })
+    const activation = vi.spyOn(ctx.subagents, 'startActivation').mockResolvedValue({
+      childId: SessionId('labelled-child'),
+      result: Promise.resolve({ output: [], stopReason: 'completed' }),
+      dispose: () => Promise.resolve(),
+    })
+    const run = start()
+    try {
+      await expect(run.result).resolves.toMatchObject({ stopReason: 'completed' })
+      expect(activation.mock.calls[0]![0]).toMatchObject({ label: '调研·Rust' })
+      expect(activation.mock.calls[0]![0].request).not.toHaveProperty('label')
+    } finally { await run.dispose() }
+  })
+
   it('collects child results without parent delivery and waits for child cleanup before settling', async () => {
     const disposing = Promise.withResolvers<undefined>()
     const released = Promise.withResolvers<undefined>()
