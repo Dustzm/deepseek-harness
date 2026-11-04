@@ -206,7 +206,7 @@ const cancellableSessionListings = [
 ] as const
 
 interface CancellableExactRead {
-  readonly name: 'traceSession' | 'traceEvent' | 'readEvent'
+  readonly name: 'traceSession' | 'traceEvent' | 'readEvent' | 'readSurface'
   readonly inspects: boolean
   readonly run: (
     ctx: Context,
@@ -230,6 +230,11 @@ const cancellableExactReads: readonly CancellableExactRead[] = [
     name: 'readEvent',
     inspects: true,
     run: (ctx, sessionId, signal) => ctx.sessionQuery.readEvent({ sessionId, seq: SessionSeq(0) }, signal),
+  },
+  {
+    name: 'readSurface',
+    inspects: true,
+    run: (ctx, sessionId, signal) => ctx.sessionQuery.readSurface(sessionId, signal),
   },
 ] as const
 
@@ -903,6 +908,117 @@ describe('session-query exact reads', () => {
           reason: expectCode('SESSION_QUERY_PERSISTENCE_FAILED'),
         },
       ])
+  })
+
+  it('projects persisted current surfaces from one listing with readSurface-equal events', async () => {
+    const entries = Array.from({ length: 20 }, (_, index) => ({
+      meta: header(`surface-batch-${index}`, index),
+      events: eventLog(`surface text ${index}`),
+    }))
+    TestPersistence.reset(entries)
+    const ctx = await liveContext()
+    await ctx.plugin(TestPersistence)
+    const ids = entries.map(entry => entry.meta.id)
+    const signal = new AbortController().signal
+
+    const results = await ctx.sessionQuery.projectSurfaces(
+      [...ids, ids[0]!],
+      source => ({ id: source.session.id, events: structuredClone(source.events) }),
+      signal,
+    )
+
+    expect(TestPersistence.listCalls).toBe(1)
+    expect(TestPersistence.listSignals).toEqual([signal])
+    expect(TestPersistence.readCalls).toEqual(ids)
+    expect(results.map(result => result.sessionId)).toEqual(ids)
+    for (const [index, result] of results.entries()) {
+      if (result.status !== 'fulfilled') throw new Error(`expected projected surface ${index}`)
+      expect(result.value.id).toBe(ids[index])
+      const surface = await ctx.sessionQuery.readSurface(ids[index]!)
+      expect(result.value.events).toEqual(surface.events)
+    }
+  })
+
+  it('isolates per-session surface failures and skips persistence for live-only batches', async () => {
+    const valid = header('surface-valid', 1)
+    const malformed = header('surface-malformed', 2)
+    const missing = SessionId('surface-missing')
+    TestPersistence.reset([
+      { meta: valid, events: eventLog('valid surface') },
+      {
+        meta: malformed,
+        events: [{
+          type: 'user/message',
+          seq: SessionSeq(0),
+          time: 1,
+          data: createUserMessage({
+            content: [{ type: 'text', text: 'no surface marker' }], source: { kind: 'user' },
+          }),
+        }] as unknown as SessionEvent[],
+      },
+    ])
+    const ctx = await liveContext()
+    await ctx.plugin(TestPersistence)
+    const projectFailure = new Error('projection failed')
+
+    const results = await ctx.sessionQuery.projectSurfaces(
+      [valid.id, malformed.id, missing],
+      (source) => {
+        if (source.events.length === 0) throw projectFailure
+        return source.events.length
+      },
+    )
+
+    expect(results).toMatchObject([
+      { sessionId: valid.id, status: 'fulfilled', value: 1 },
+      { sessionId: malformed.id, status: 'rejected', reason: expectCode('SESSION_QUERY_INVALID_SURFACE') },
+      { sessionId: missing, status: 'rejected', reason: expectCode('SESSION_QUERY_SESSION_NOT_FOUND') },
+    ])
+    expect(TestPersistence.listCalls).toBe(1)
+
+    const empty = ctx.sessions.create(SessionId('surface-live-empty'))
+    const live = ctx.sessions.create(SessionId('surface-live'))
+    live.append(
+      'user/message',
+      createUserMessage({ content: [{ type: 'text', text: 'live surface' }], source: { kind: 'user' } }),
+      { surfaceOp: 'append' },
+    )
+    const liveResults = await ctx.sessionQuery.projectSurfaces(
+      [live.id, empty.id],
+      (source) => {
+        if (source.events.length === 0) throw projectFailure
+        return source.session.id
+      },
+    )
+
+    expect(liveResults).toEqual([
+      { sessionId: live.id, status: 'fulfilled', value: live.id },
+      { sessionId: empty.id, status: 'rejected', reason: projectFailure },
+    ])
+    expect(TestPersistence.listCalls).toBe(1)
+  })
+
+  it('rejects a cancelled surface projection batch with the abort reason', async () => {
+    const persisted = header('surface-cancelled', 1)
+    TestPersistence.reset([{ meta: persisted, events: eventLog() }])
+    const ctx = await liveContext()
+    await ctx.plugin(TestPersistence)
+    const controller = new AbortController()
+    const reason = new Error('surface batch cancelled')
+    const started = Promise.withResolvers<undefined>()
+    TestPersistence.readOverride = (_id, signal) => new Promise((_resolve, reject) => {
+      started.resolve(undefined)
+      signal?.addEventListener('abort', () => { reject(reason) }, { once: true })
+    })
+    const project = vi.fn(() => 'projected')
+
+    const pending = ctx.sessionQuery.projectSurfaces([persisted.id], project, controller.signal)
+    await started.promise
+    controller.abort(reason)
+
+    await expect(pending).rejects.toBe(reason)
+    expect(TestPersistence.readSignals).toEqual([controller.signal])
+    expect(project).not.toHaveBeenCalled()
   })
 
   it('lists live sessions deterministically and returns detached headers', async () => {

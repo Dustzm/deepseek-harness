@@ -2453,11 +2453,17 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'matching semantic documents in ascending seq order.',
       },
       {
-        signature: 'async readSurface(sessionId: SessionId): Promise<SessionSurfaceSnapshot>',
+        signature: 'async readSurface(sessionId: SessionId, signal?: AbortSignal): Promise<SessionSurfaceSnapshot>',
         description: 'Read one session\'s complete current model surface from one corpus observation.',
-        parameters: [{ name: 'sessionId', description: 'live-preferred session id to read.' }],
+        parameters: [{ name: 'sessionId', description: 'live-preferred session id to read.' }, { name: 'signal', description: 'optional cancellation for persisted source resolution.' }],
         returns: 'cloned header, current surface, and the last sequence number included in the raw-log capture.',
         throws: ['when source resolution fails or the session surface is invalid.'],
+      },
+      {
+        signature: 'async projectSurfaces<Value>( sessionIds: readonly SessionId[], project: (source: SessionSurfaceSource) => Value, signal?: AbortSignal, ): Promise<SessionSurfaceProjectionResult<Value>[]>',
+        description: 'Project the current model surface of unique sessions from one cancellable corpus observation.\n\nThe whole batch lists persistence at most once and never lists it when every id is live. Persisted inspections run with `persistedReadConcurrency` workers, and each log is projected and released before its worker claims another id. Results preserve first-occurrence input order. Resolution, surface-validation, and projection failures stay isolated per session, while cancellation rejects the complete operation.',
+        parameters: [{ name: 'sessionIds', description: 'live or persisted session ids to observe.' }, { name: 'project', description: 'synchronous fold over borrowed events; it must clone every value it retains.' }, { name: 'signal', description: 'optional cancellation shared by listing and every persisted inspection.' }],
+        returns: 'one fulfilled or rejected result per unique requested id.',
       },
       {
         signature: 'async traceSession(sessionId: SessionId, signal?: AbortSignal): Promise<SessionLineageTrace>',
@@ -7479,8 +7485,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SessionSurface {\n    readonly nodes: readonly SessionSeq[];\n    readonly replaceGeneration: number;\n    readonly contentGeneration: number;\n}',
   },
   {
+    name: 'SessionSurfaceProjectionResult',
+    declaration: 'export type SessionSurfaceProjectionResult<Value> = {\n    sessionId: SessionId;\n    status: \'fulfilled\';\n    value: Value;\n} | {\n    sessionId: SessionId;\n    status: \'rejected\';\n    reason: unknown;\n};',
+  },
+  {
     name: 'SessionSurfaceSnapshot',
     declaration: 'export interface SessionSurfaceSnapshot {\n    session: SessionHeader;\n    inheritedEventCount: SessionLogOffset;\n    capturedThroughSeq: OptionalSessionSeq;\n    events: SurfaceEvent[];\n}',
+  },
+  {
+    name: 'SessionSurfaceSource',
+    declaration: 'export interface SessionSurfaceSource {\n    readonly session: SessionHeader;\n    readonly events: readonly SurfaceEvent[];\n}',
   },
   {
     name: 'SessionTelemetryRecord',
