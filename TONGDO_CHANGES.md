@@ -29,6 +29,7 @@
 | 模型选择弹窗根菜单的扩展行扩展位 `conversation.input.model.menu.row` | 通用扩展接口 | `packages/client/ui-model-selection`（`slots.ts`、`index.ts`、`ModelSelect.tsx` 与样式、测试、中英 README） | 弹窗根菜单只有写死的「模型」「推理强度」两行，下游加不了按会话的开关（如通办的通力协作）；新增 list 扩展位，条目沿用原生行样式并接入方向键与 Tab，空列表时菜单不变 | 上游提供等价扩展位后可去掉 |
 | workflow 子会话用脚本的 `agent()` label 命名（未传 label 时仍是 `<meta.name> child <n>`） | 内核修正 | `packages/workflow/workflow-ptc`（`types.ts`、`runtime.ts`、`host.ts`、重新生成的 `guest-source.ts`、测试、中英 README） | 子会话名写死成「工作流名 child 序号」，子智能体列表、子会话窗口与标题里出现 `cli-lang-compare child 1` 这类名字，和脚本给成员起的名字对不上；label 只用于命名，不改变执行 | 上游改为使用 label 后可去掉 |
 | 快捷键命令接管 `ctx.shortcuts.override(id, resolve)` | 通用扩展接口 | `packages/client/shortcuts`（`src/client/registry.ts`、`types.ts`、`index.ts`，测试 `tests/registry.client.spec.ts`，中英 README） | 同一默认键位只能注册一个命令，冲突直接报错，下游想让已有快捷键（如 ⌘K 的 `session.search`）打开自己的界面，只能改原注册方；接管只替换操作，ID、名称、默认值与用户改过的键位仍归原命令，释放后恢复，没有接管时行为不变 | 上游提供等价接口后可去掉 |
+| 设置导航 `ctx.settingsNavigation`（`sections`、`openSection(id)`、`SectionIcon`） | 通用扩展接口 | `packages/client/ui-settings-general`（`src/client/navigation.ts`、`section-icons.tsx`、`index.ts`、`SettingsRoot.tsx`，测试 `tests/shell.client.spec.ts`，中英 README） | 设置窗只能整体打开，分区选择在外壳私有的 store 里，导航图标按 id 写死在组件里，面板外的功能（如全局搜索）列不出分区、打不开到某个分区、也画不出与导航一致的图标；新增服务复用外壳同一份分区投影与图标逻辑，外壳行为不变 | 上游提供等价接口后可去掉 |
 
 ## 核心仓库如何使用这些改动
 

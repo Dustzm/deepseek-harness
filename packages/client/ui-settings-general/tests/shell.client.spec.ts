@@ -11,6 +11,9 @@ import { createClientTest, type TestClient, webApp } from '@deepseek-ai/dsh-clie
 import { inject } from '../src/client/index.ts'
 import type { SettingsRootInjected } from '../src/client/shell-contract.ts'
 import { SettingsRoot } from '../src/client/SettingsRoot.tsx'
+import type { createSettingsShellStore } from '../src/client/shell-store.ts'
+import { render } from '@testing-library/react'
+import { createElement } from 'react'
 import type { DesktopUpdatePresentation } from '../src/types.ts'
 
 const SELF = '@deepseek-ai/dsh-client-ui-settings-general'
@@ -74,6 +77,27 @@ describe('ui-settings-general shell', () => {
     expect(c.ctx.slots.entries('sidebar.toggle.badge')).toHaveLength(0)
     publish!({ phase: 'error', version: status.version, failure: 'install' })
     expect(row.hooks.desktopUpdate.getSnapshot().presentation).toEqual(status)
+  }, COLD_BOOT_TIMEOUT_MS)
+
+  it('exposes the nav rows, opens one section, and draws the icon the nav rail shows', async ({ start }) => {
+    const c = await start()
+    const navigation = c.ctx.settingsNavigation
+    expect(navigation.sections).toBe(injectedOf(c).hooks.sections)
+    expect(navigation.sections.getSnapshot().map(row => row.id)).toEqual(PRODUCT_SECTIONS)
+    expect(() => { navigation.openSection('missing') }).toThrow('section "missing" is not registered')
+    const shell = (c.ctx.slots.entries('sidebar.settings')[0]!.store as ReturnType<typeof createSettingsShellStore>).create()
+    navigation.openSection('models')
+    expect(shell.store.getSnapshot()).toEqual({ open: true, activeId: 'models' })
+
+    const { SectionIcon } = navigation
+    const builtin = render(createElement(SectionIcon, { id: 'models', className: 'nav', size: 16 }))
+    expect(builtin.container.querySelector('svg.nav')).not.toBeNull()
+    const Registered = vi.fn(({ size }: { size: number }) => createElement('i', { 'data-size': size }))
+    c.ctx.slots.register({ name: 'settings.section.icon', key: 'models' }, Registered)
+    await c.flush()
+    expect(builtin.container.querySelector('i')?.dataset.size).toBe('16')
+    expect(Registered.mock.lastCall?.[0]).toEqual({ className: 'nav', size: 16 })
+    builtin.unmount()
   }, COLD_BOOT_TIMEOUT_MS)
 
   it('declares its services', () => {
