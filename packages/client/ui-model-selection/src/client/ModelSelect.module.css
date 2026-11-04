@@ -308,6 +308,11 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+/* Extension rows sit in the root pane's flow as if they were native cells. */
+.extensionRows {
+  display: contents;
+}
+
 .cellLabel {
   flex: 0 0 auto;
   white-space: nowrap;

@@ -7,6 +7,7 @@ import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { ComponentProps } from 'react'
 import type { ModelDirectoryState } from '../src/client/directory.ts'
+import type { ModelMenuRowOwner } from '../src/client/slots.ts'
 import { ModelSelect } from '../src/client/ModelSelect.tsx'
 import { en, zh } from '../src/client/locales.ts'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
@@ -95,6 +96,7 @@ describe('ModelSelect label slot', () => {
     })
     await runtime.root.declare({
       'conversation.input.model.label': { kind: 'single', scope: 'session', inline: true },
+      'conversation.input.model.menu.row': { kind: 'list', scope: 'session' },
     }, ({ renderSlot, SessionProvider }) => <SessionProvider session={session}>
       <ModelSelect locked={false} available directory={directory} load={vi.fn()} select={select} t={t} renderSlot={renderSlot} />
     </SessionProvider>)
@@ -145,6 +147,57 @@ describe('ModelSelect label slot', () => {
     act(() => { directory.set(state({ groups: [] })) })
     expect(screen.getByRole('button', { name: '请选择模型' })).toBeTruthy()
     expect(renderSlot).not.toHaveBeenCalled()
+  })
+})
+
+describe('ModelSelect menu extension rows', () => {
+  it('renders extension rows below the root cells with the native row styling and walks them with the keyboard', () => {
+    const directory = createSnapshotStore<ModelDirectoryState>(state())
+    const toggle = vi.fn()
+    const owners: unknown[] = []
+    const renderSlot: ComponentProps<typeof ModelSelect>['renderSlot'] = (name, owner, options) => {
+      if (name !== 'conversation.input.model.menu.row') return options?.fallback ?? null
+      owners.push(owner)
+      const { classNames } = owner as ModelMenuRowOwner
+      return (
+        <button type="button" role="menuitemcheckbox" aria-checked={false} className={classNames.row} onClick={toggle}>
+          <span className={classNames.label}>Extra</span>
+        </button>
+      )
+    }
+    render(<ModelSelect renderSlot={renderSlot} locked={false} available directory={directory} load={vi.fn()} select={vi.fn()} t={t} />)
+
+    const trigger = screen.getByRole('button', { name: '选择模型，当前 DeepSeek-V4-Flash，推理等级 High' })
+    fireEvent.click(trigger)
+    const extra = screen.getByRole('menuitemcheckbox', { name: 'Extra' })
+    expect(owners.at(-1)).toMatchObject({ current: { provider: 'deepseek-official', model: 'deepseek-v4-flash' } })
+    const effort = screen.getByRole('menuitem', { name: /推理等级/ })
+    expect(extra.className).toBe(screen.getByRole('menuitem', { name: /模型/ }).className)
+
+    effort.focus()
+    fireEvent.keyDown(effort, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(extra)
+    fireEvent.keyDown(extra, { key: 'Tab' })
+    expect(toggle).toHaveBeenCalledOnce()
+    fireEvent.keyDown(extra, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /模型/ }))
+
+    // Drilled panes keep their own rows; extension rows belong to the root pane.
+    fireEvent.click(effort)
+    expect(screen.queryByRole('menuitemcheckbox', { name: 'Extra' })).toBeNull()
+  })
+
+  it('hands extension rows a null selection when the open root pane loses its current model', () => {
+    const directory = createSnapshotStore<ModelDirectoryState>(state())
+    const owners: unknown[] = []
+    const renderSlot: ComponentProps<typeof ModelSelect>['renderSlot'] = (name, owner, options) => {
+      if (name === 'conversation.input.model.menu.row') owners.push(owner)
+      return options?.fallback ?? null
+    }
+    render(<ModelSelect renderSlot={renderSlot} locked={false} available directory={directory} load={vi.fn()} select={vi.fn()} t={t} />)
+    fireEvent.click(screen.getByRole('button', { name: '选择模型，当前 DeepSeek-V4-Flash，推理等级 High' }))
+    act(() => { directory.set(state({ current: null })) })
+    expect(owners.at(-1)).toMatchObject({ current: null })
   })
 })
 
