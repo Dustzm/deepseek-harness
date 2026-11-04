@@ -32,6 +32,14 @@ const S2_CMDS: CommandDescriptor[] = [
   { name: 'attach', description: 'attach a file', input: { hint: 'path' } },
 ]
 
+/** Presentation aliases in both UI languages, as the service's registry would index them. */
+const ALIASES = new Map([
+  ['目标', CommandDefinitionId('@deepseek-ai/dsh-command-goal')],
+  ['goal', CommandDefinitionId('@deepseek-ai/dsh-command-goal')],
+  ['计划', CommandDefinitionId('@deepseek-ai/dsh-plan-mode')],
+  ['plan', CommandDefinitionId('@deepseek-ai/dsh-plan-mode')],
+])
+
 /** Directory over per-key pull queues: each fetch appends a hand-settled deferred. */
 function bench() {
   const pulls = new Map<SessionId, Array<ReturnType<typeof deferred<readonly CommandDescriptor[]>>>>()
@@ -43,7 +51,7 @@ function bench() {
     queue.push(d)
     pulls.set(key, queue)
     return d.promise
-  })
+  }, () => ALIASES)
   const pull = (key: SessionId, i: number) => {
     const d = pulls.get(key)?.[i]
     if (d === undefined) throw new Error(`no pull #${i} for ${key}`)

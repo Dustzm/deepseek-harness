@@ -1,4 +1,4 @@
-/** Composer menu grouping, localized labels, descriptions, and icons. */
+/** Composer menu sections and the first-party Host command faces this package presents. */
 import type { ComponentType } from 'react'
 import type { InputTriggerCandidate } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import {
@@ -7,80 +7,74 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { IconProps } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
-import type { CommandDescriptor } from '@deepseek-ai/dsh-commands/types'
-import type { CommandKey } from './locales.ts'
-import { builtinCommandName } from './resolution.ts'
-import type { BuiltinCommandName } from './resolution.ts'
+import type { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
+import type { CommandPresentation, MenuPlacement } from './contract.ts'
+import { en, zh } from './locales.ts'
 
-/** The menu's two sections. */
-export type MenuSection = 'add' | 'commands'
-
-/** Row names per section, highest usage first; rows outside both lists close the Commands section in catalog order. */
-const SECTION_ROWS: Readonly<Record<MenuSection, readonly string[]>> = {
-  add: ['file', 'goal', 'plan', 'feedback'],
-  commands: ['compact', 'permission', 'model', 'export'],
-}
-
-/** The dictionary keys and glyph of one built-in Host command's client face. */
-interface HostFace {
-  readonly label: CommandKey
-  readonly description: CommandKey
+/** One first-party Host command: its definition, glyph, and empty-query position. */
+interface BuiltinFace {
+  readonly definitionId: string
   readonly icon: ComponentType<IconProps>
+  readonly placement: MenuPlacement
 }
 
-/** One built-in Host command's face, keyed by its dictionary entries. */
-function hostFace(name: BuiltinCommandName, icon: ComponentType<IconProps>): readonly [BuiltinCommandName, HostFace] {
-  return [name, {
-    label: `label.${name}`,
-    description: `description.${name}`,
-    icon,
-  }]
-}
-
-/** Built-in Host commands whose client face this package owns. */
-const HOST_FACES: ReadonlyMap<BuiltinCommandName, HostFace> = new Map([
-  hostFace('goal', IconGoalOutlineRegular),
-  hostFace('plan', IconPlanOutlineRegular),
-  hostFace('feedback', IconPaperPlaneOutlineRegular),
-  hostFace('compact', IconCompactOutlineRegular),
-  hostFace('permission', PermissionIconFullAccessRegular),
-  hostFace('export', IconDownloadOutlineRegular),
-])
+/** First-party Host commands whose localized face this package registers, by registered name. */
+const BUILTINS = {
+  goal: { definitionId: '@deepseek-ai/dsh-command-goal', icon: IconGoalOutlineRegular, placement: { section: 'add', rank: 20 } },
+  plan: { definitionId: '@deepseek-ai/dsh-plan-mode', icon: IconPlanOutlineRegular, placement: { section: 'add', rank: 30 } },
+  feedback: { definitionId: '@deepseek-ai/dsh-command-feedback', icon: IconPaperPlaneOutlineRegular, placement: { section: 'add', rank: 40 } },
+  compact: { definitionId: '@deepseek-ai/dsh-command-compact', icon: IconCompactOutlineRegular, placement: { section: 'commands', rank: 10 } },
+  permission: { definitionId: '@deepseek-ai/dsh-permission-presets', icon: PermissionIconFullAccessRegular, placement: { section: 'commands', rank: 20 } },
+  export: { definitionId: '@deepseek-ai/dsh-session-log-export', icon: IconDownloadOutlineRegular, placement: { section: 'commands', rank: 40 } },
+} as const satisfies Record<string, BuiltinFace>
 
 /**
- * The localized menu face of a catalog row.
- * @param descriptor - effective Host command descriptor.
+ * The first-party Host command faces, registered through the same
+ * `present()` operation third-party packages use. Every locale's token is an
+ * alias, so a draft written in either language resolves.
  * @param t - the `command` namespace translator.
- * @returns title, description, and glyph for a built-in command; undefined
- * for any other row, which keeps its catalog description.
+ * @returns one presentation per first-party command.
  */
-export function builtinRowFace(
-  descriptor: CommandDescriptor,
-  t: TranslateNS<'command'>,
-): Pick<InputTriggerCandidate, 'label' | 'description' | 'icon'> | undefined {
-  const name = builtinCommandName(descriptor)
-  const face = name === undefined ? undefined : HOST_FACES.get(name)
-  return face === undefined ? undefined : { label: t(face.label), description: t(face.description), icon: face.icon }
+export function builtinPresentations(t: TranslateNS<'command'>): readonly CommandPresentation[] {
+  return (Object.keys(BUILTINS) as Array<keyof typeof BUILTINS>).map((name) => {
+    const face = BUILTINS[name]
+    return {
+      // The ids are the first-party packages' registered definition ids.
+      definitionId: face.definitionId as CommandDefinitionId,
+      label: () => t(`label.${name}`),
+      description: () => t(`description.${name}`),
+      icon: face.icon,
+      token: () => t(`token.${name}`),
+      aliases: [zh[`token.${name}`], en[`token.${name}`]],
+      placement: face.placement,
+    }
+  })
 }
 
 /**
  * Arrange the empty-query menu: the Add section, then the Commands section,
- * each in usage order, with unlisted rows closing Commands in their input
- * order; each row carries its section heading.
+ * each ascending by placement rank; unplaced rows close Commands in their
+ * input order. Each row carries its section heading.
  * @param rows - the visible candidates in catalog-then-contribution order.
+ * @param placements - placement per row name.
  * @param t - the `command` namespace translator.
  * @returns the sectioned rows.
  */
-export function sectionRows(rows: readonly InputTriggerCandidate[], t: TranslateNS<'command'>): readonly InputTriggerCandidate[] {
-  const listed = new Set([...SECTION_ROWS.add, ...SECTION_ROWS.commands])
-  const byName = new Map(rows.map(row => [row.name, row]))
-  const pick = (names: readonly string[]): InputTriggerCandidate[] =>
-    names.flatMap((name) => {
-      const row = byName.get(name)
-      return row === undefined ? [] : [row]
+export function sectionRows(
+  rows: readonly InputTriggerCandidate[],
+  placements: ReadonlyMap<string, MenuPlacement>,
+  t: TranslateNS<'command'>,
+): readonly InputTriggerCandidate[] {
+  const placed = (section: MenuPlacement['section']): InputTriggerCandidate[] => rows
+    .flatMap((row) => {
+      const placement = placements.get(row.name)
+      return placement?.section === section ? [{ row, rank: placement.rank }] : []
     })
-  const add = pick(SECTION_ROWS.add).map(row => ({ ...row, section: t('section.add') }))
-  const commands = [...pick(SECTION_ROWS.commands), ...rows.filter(row => !listed.has(row.name))]
+    // Array.prototype.sort is stable, so equal ranks keep their input order.
+    .sort((a, b) => a.rank - b.rank)
+    .map(entry => entry.row)
+  const add = placed('add').map(row => ({ ...row, section: t('section.add') }))
+  const commands = [...placed('commands'), ...rows.filter(row => !placements.has(row.name))]
     .map(row => ({ ...row, section: t('section.commands') }))
   return [...add, ...commands]
 }

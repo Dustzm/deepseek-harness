@@ -44,6 +44,8 @@ export interface ChildStartRequest {
   provider?: string
   /** The per-child model override, if the call passed one. */
   model?: string
+  /** The script's explicit `agent()` label; it names the child Session when present. */
+  label?: string
 }
 
 /**

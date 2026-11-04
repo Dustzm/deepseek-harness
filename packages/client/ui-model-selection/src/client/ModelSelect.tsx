@@ -55,6 +55,12 @@ interface EffortChoice {
 /** Unplaced portal card: hidden but laid out at a fixed origin so offsetWidth/offsetHeight are real (Menu primitive's measure pass). */
 const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
 
+/** The native root-pane row styling handed to `conversation.input.model.menu.row` entries. */
+const ROW_CLASS_NAMES = { row: css.cell, label: css.cellLabel, value: css.cellValue }
+
+/** Focusable extension rows inside the root pane's slot container. */
+const EXTENSION_ROW_SELECTOR = '[data-model-menu-rows] button[role^="menuitem"]'
+
 /**
  * Render the composer model seat.
  * @param props - owner share (locked) + injected face (shared directory
@@ -64,7 +70,7 @@ const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
 export function ModelSelect(
   { locked, available, directory, load, select, t, renderSlot }:
   ModelSelectInjected & Pick<PropsRuntime<'conversation.input.model'>, 'locked'> & PropsLocale<'model'>
-    & Omit<PropsRenderSlots<'conversation.input.model.label'>, 'SessionProvider'>,
+    & Omit<PropsRenderSlots<'conversation.input.model.label' | 'conversation.input.model.menu.row'>, 'SessionProvider'>,
 ) {
   const state = useSyncExternalStore(
     fn => directory.subscribe(fn),
@@ -287,8 +293,16 @@ export function ModelSelect(
     setPane('root')
   }
 
+  /** Focusable menu rows in order: the pane's native rows, then the root pane's extension rows. */
+  const menuRows = (): HTMLButtonElement[] => [
+    ...itemRefs.current.filter((item): item is HTMLButtonElement => item !== null),
+    ...pane === 'root'
+      ? Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>(EXTENSION_ROW_SELECTOR) ?? [])
+      : [],
+  ]
+
   const moveFocus = (offset: number): void => {
-    const items = itemRefs.current.filter(item => item !== null)
+    const items = menuRows()
     if (items.length === 0) return
     const active = items.findIndex(item => item === document.activeElement)
     // Focus outside the rows (the trigger, which keeps it while the menu
@@ -342,7 +356,7 @@ export function ModelSelect(
       // control inside the card (a retry button) keeps the browser's traversal,
       // so the keystroke stays unconsumed there.
       const focused = document.activeElement
-      const rows = itemRefs.current.filter((item): item is HTMLButtonElement => item !== null)
+      const rows = menuRows()
       if (focused instanceof HTMLButtonElement && rows.includes(focused)) {
         event.preventDefault()
         focused.click()
@@ -520,6 +534,12 @@ export function ModelSelect(
                   <IconChevronRightOutlineRegular className={css.cellChevron} />
                 </button>
               )}
+              <div className={css.extensionRows} data-model-menu-rows="" role="none">
+                {renderSlot('conversation.input.model.menu.row', {
+                  current: state.current === null ? null : { provider: state.current.provider, model: state.current.model },
+                  classNames: ROW_CLASS_NAMES,
+                })}
+              </div>
             </>
           )}
 

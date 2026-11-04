@@ -7,6 +7,7 @@ import type { ComponentType } from 'react'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { ClientSessionContext } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type { IconProps } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
 
 /** Copy for an option that must be acknowledged before onSelect can run. */
 export interface SelectConfirmation {
@@ -91,6 +92,19 @@ export interface ActionSpec {
 /** The UI behavior of a contribution or decoration. */
 export type CommandUiSpec = PopupSelectSpec | ActionSpec
 
+/** The empty-query menu's two sections, in display order. */
+export type MenuSection = 'add' | 'commands'
+
+/**
+ * Where a row sits in the empty-query menu. Rows ascend by `rank` inside
+ * their section; rows without a placement close the Commands section in
+ * catalog-then-contribution order.
+ */
+export interface MenuPlacement {
+  readonly section: MenuSection
+  readonly rank: number
+}
+
 /**
  * One client-owned command contribution: a slash-menu entry whose behavior
  * lives entirely on the client (no host descriptor). Merged with the host
@@ -107,10 +121,40 @@ export interface CommandContribution {
   description?(): string
   /** Menu row glyph from the shared icon set. */
   readonly icon?: ComponentType<IconProps>
+  /** Empty-query menu position; the row closes the Commands section when absent. */
+  readonly placement?: MenuPlacement
   /** Capability filter, called with a fresh projection per candidate pass. */
   available(session: ClientSessionContext): boolean
   /** The command's UI behavior. */
   readonly ui: CommandUiSpec
+}
+
+/**
+ * The localized client face of one HOST command definition: its menu row
+ * copy, glyph, empty-query position, and the spellings a draft may carry.
+ * Keyed by `definitionId`, so a scoped override registered under the same
+ * name but another definition keeps its own catalog copy. A typed alias
+ * resolves to the effective descriptor carrying this definition; the
+ * command.execute line always uses the Host's registered name.
+ */
+export interface CommandPresentation {
+  /** The Host command definition this face presents. */
+  readonly definitionId: CommandDefinitionId
+  /** Localized menu row title. */
+  label(): string
+  /** Localized menu row description. */
+  description(): string
+  /** Menu row glyph from the shared icon set. */
+  readonly icon: ComponentType<IconProps>
+  /** Localized spelling a menu pick writes into the draft (without the leading slash). */
+  token(): string
+  /**
+   * Every typed spelling, in every UI language, that resolves to this
+   * definition besides the registered name (without the leading slash).
+   */
+  readonly aliases: readonly string[]
+  /** Empty-query menu position; the row closes the Commands section when absent. */
+  readonly placement?: MenuPlacement
 }
 
 /**
@@ -143,6 +187,12 @@ export interface CommandUiContract {
    * Duplicate names throw at registration.
    */
   decorate(decoration: CommandDecoration): () => void
+  /**
+   * Give one Host command definition its localized face; effect disposer.
+   * A duplicate definition id, or an alias another presentation already
+   * claims, throws at registration.
+   */
+  present(presentation: CommandPresentation): () => void
   /** Close this command's open popups and confirmations without consuming composer drafts. */
   dismiss(name: string): void
   /** Resolve the per-session popup controller for one session scope (wiring/overlay layer). */

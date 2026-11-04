@@ -17,6 +17,19 @@ export interface ModelLabelOwner {
   selected: boolean
 }
 
+/**
+ * Owner data of one extension row in the model menu's root pane. An entry
+ * renders exactly one focusable `button` with a `menuitem`, `menuitemcheckbox`,
+ * or `menuitemradio` role; the menu's arrow keys and Tab reach it after the
+ * native Model and Effort rows. The class names style it like those rows.
+ */
+export interface ModelMenuRowOwner {
+  /** The Session's current provider/model selection, or null before one loads. */
+  current: { provider: string; model: string } | null
+  /** Class names of the native root-pane row: the row button, its label, and its trailing value. */
+  classNames: { row: string | undefined; label: string | undefined; value: string | undefined }
+}
+
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
     /**
@@ -38,6 +51,15 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       scope: 'session'
       inline: true
       owner: ModelLabelOwner
+    }
+    /**
+     * Extension rows below the Model and Effort rows of the model menu's root
+     * pane, in registration order. An empty list leaves the menu unchanged.
+     */
+    'conversation.input.model.menu.row': {
+      kind: 'list'
+      scope: 'session'
+      owner: ModelMenuRowOwner
     }
   }
 }
