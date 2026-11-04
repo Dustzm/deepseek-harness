@@ -8,6 +8,7 @@
 import type { CommandDescriptor } from '@deepseek-ai/dsh-commands/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { resolveCommand } from './resolution.ts'
+import type { AliasIndex } from './resolution.ts'
 
 export type { CommandDescriptor } from '@deepseek-ai/dsh-commands/types'
 
@@ -35,7 +36,14 @@ class Entry {
 export class CommandDirectory {
   private readonly entries = new Map<SessionId, Entry>()
 
-  constructor(private readonly fetchCommands: FetchCommands) {}
+  /**
+   * @param fetchCommands - the injected catalog pull.
+   * @param aliases - reads the live presentation alias index at each lookup.
+   */
+  constructor(
+    private readonly fetchCommands: FetchCommands,
+    private readonly aliases: () => AliasIndex,
+  ) {}
 
   /**
    * Current cache status for one session.
@@ -47,7 +55,7 @@ export class CommandDirectory {
   }
 
   /**
-   * Synchronous command lookup over one Session's ready catalog; exact names precede localized aliases.
+   * Synchronous command lookup over one Session's ready catalog; exact names precede presentation aliases.
    * @param sessionId - session key.
    * @param name - typed command spelling without the leading slash.
    * @returns the descriptor, or undefined when absent or the entry is not ready.
@@ -55,7 +63,7 @@ export class CommandDirectory {
   resolve(sessionId: SessionId, name: string): CommandDescriptor | undefined {
     const entry = this.entries.get(sessionId)
     if (entry === undefined || entry.state !== 'ready') return undefined
-    return resolveCommand(name, entry.commands)
+    return resolveCommand(name, entry.commands, this.aliases())
   }
 
   /** Soft invalidation (commands-changed): background repull on every touched key; ready snapshots keep serving. */

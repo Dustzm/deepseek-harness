@@ -131,6 +131,7 @@ export function apply(ctx: ClientContext): void {
       label: () => t('command.label'),
       description: () => t('command.description'),
       icon: IconDataOutlineRegular,
+      placement: { section: 'commands', rank: 30 },
       available: session => sessions.subagentAddress(session.sessionId) === undefined,
       ui: {
         kind: 'popupSelect',

@@ -2,8 +2,8 @@
  * CommandUiRuntime (`ctx.commandUi`): the '/' command source over the
  * session-keyed directory, the client-contribution registry, and the
  * per-session popupSelect controllers. Candidate synthesis merges the host
- * catalog with contributions by availability, gives built-in Host rows their
- * localized face (presentation.ts), then position-filters; an empty query
+ * catalog with contributions by availability, gives presented Host rows their
+ * registered face (`present()`), then position-filters; an empty query
  * lists the Add and Commands sections in usage order, a typed query ranks
  * every row by the `/` menu's shared name-and-label ranking (ui-primitives
  * `rankByName`). A host/contribution name collision fails loud. Every
@@ -28,12 +28,12 @@ import type {
   CandidateRequest, ClientSessionContext, CommandClaim, PickOutcome, InputTriggerCandidate, InputTriggerPick,
   SubmitAttachment, SubmitEnvelope, SubmitOutcome,
 } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
-import type { CommandContribution, CommandDecoration, CommandUiContract } from './contract.ts'
+import type { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
+import type { CommandContribution, CommandDecoration, CommandPresentation, CommandUiContract, MenuPlacement } from './contract.ts'
 import type { CommandDescriptor } from './directory.ts'
 import { CommandDirectory } from './directory.ts'
 import { PopupSelectController } from './popup.ts'
-import { builtinRowFace, sectionRows } from './presentation.ts'
-import { claimToken } from './resolution.ts'
+import { builtinPresentations, sectionRows } from './presentation.ts'
 import type { TokenSegment } from './popup.ts'
 
 declare module '@deepseek-ai/dsh-api-session-controller/client' {
@@ -69,6 +69,9 @@ function submittedCommandName(line: string): string {
 interface LiveState {
   readonly contributions: Map<string, CommandContribution>
   readonly decorations: Map<string, CommandDecoration>
+  readonly presentations: Map<CommandDefinitionId, CommandPresentation>
+  /** Typed alias → presented definition; rebuilt only by present() and its disposer. */
+  readonly aliases: Map<string, CommandDefinitionId>
   readonly popups: WeakMapWithValues<SessionBinding, PopupSelectController<ClientSessionContext>>
 }
 
@@ -80,6 +83,8 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
   private readonly live: LiveState = {
     contributions: new Map(),
     decorations: new Map(),
+    presentations: new Map(),
+    aliases: new Map(),
     popups: new WeakMapWithValues(),
   }
   /** `command`-namespace translator (composer refusal notices). */
@@ -109,7 +114,8 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
         if (!result.ok) throw new Error(`command.list failed: ${result.error.code}: ${result.error.message}`)
         return result.value
       })
-    })
+    }, () => this.live.aliases)
+    for (const presentation of builtinPresentations(this.t)) this.present(presentation)
     const inputTriggers = ctx.get('inputTriggers')
     if (inputTriggers === undefined) throw new Error('ui-commands: slash service unavailable')
     ctx.effect(() => inputTriggers.registerSource({
@@ -167,6 +173,33 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
   }
 
   /**
+   * Give one Host command definition its localized face; effect disposer
+   * (rides the caller's fiber). A duplicate definition id or a claimed alias
+   * throws before anything is registered.
+   * @param presentation - the definition's row copy, glyph, tokens, and placement.
+   * @returns the disposer removing the face and its aliases.
+   */
+  present(presentation: CommandPresentation): () => void {
+    const dispose = this.ctx.effect(() => {
+      const { presentations, aliases } = this.live
+      if (presentations.has(presentation.definitionId)) {
+        throw new Error(`ui-commands: duplicate presentation for ${presentation.definitionId}`)
+      }
+      const claimed = presentation.aliases.filter(alias => aliases.has(alias))
+      if (claimed.length > 0) {
+        throw new Error(`ui-commands: presentation ${presentation.definitionId} aliases already claimed: ${claimed.join(', ')}`)
+      }
+      presentations.set(presentation.definitionId, presentation)
+      for (const alias of presentation.aliases) aliases.set(alias, presentation.definitionId)
+      return () => {
+        presentations.delete(presentation.definitionId)
+        for (const alias of presentation.aliases) aliases.delete(alias)
+      }
+    }, 'command.present()')
+    return () => { void dispose() }
+  }
+
+  /**
    * Close every open popup for a command whose options have become stale.
    * Pending loads and confirmations lose their binding; drafts stay intact.
    * @param name - command name without the leading slash.
@@ -216,20 +249,30 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
     return controller
   }
 
+  /** The registered face of a Host descriptor's definition, when any. */
+  private presentationOf(descriptor: CommandDescriptor): CommandPresentation | undefined {
+    return descriptor.definitionId === undefined ? undefined : this.live.presentations.get(descriptor.definitionId)
+  }
+
   /**
-   * Menu candidates: host catalog + contribution availability, built-in rows
-   * localized, then position filtering; sections for an empty query, the
-   * shared name-and-label ranking for a typed one.
+   * Menu candidates: host catalog + contribution availability, presented
+   * Host rows localized, then position filtering; sections for an empty
+   * query, the shared name-and-label ranking for a typed one.
    */
   private async candidates(session: ClientSessionContext, req: CandidateRequest): Promise<readonly InputTriggerCandidate[]> {
     const list = await this.directory.ensureReady(session.sessionId, req.signal)
     const rows: InputTriggerCandidate[] = []
+    const placements = new Map<string, MenuPlacement>()
     const seen = new Set<string>()
     for (const c of list) {
       seen.add(c.name)
+      const face = this.presentationOf(c)
+      if (face?.placement !== undefined) placements.set(c.name, face.placement)
       rows.push({
         name: c.name,
-        ...(builtinRowFace(c, this.t) ?? { description: c.description }),
+        ...(face === undefined
+          ? { description: c.description }
+          : { label: face.label(), description: face.description(), icon: face.icon }),
         ...(c.input !== undefined ? { hint: c.input.hint } : {}),
       })
     }
@@ -238,6 +281,7 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
       if (seen.has(contribution.name)) {
         throw new Error(`ui-commands: contribution /${contribution.name} collides with a host command`)
       }
+      if (contribution.placement !== undefined) placements.set(contribution.name, contribution.placement)
       rows.push({
         name: contribution.name,
         ...(contribution.label === undefined ? {} : { label: contribution.label() }),
@@ -246,7 +290,7 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
       })
     }
     const visible = rows.filter(c => req.position === 'leading' || c.hint === undefined)
-    return req.query === '' ? sectionRows(visible, this.t) : rankByName(visible, req.query)
+    return req.query === '' ? sectionRows(visible, placements, this.t) : rankByName(visible, req.query)
   }
 
   /** Decision table, menu column: contribution/decorated-host → popup or action; host input → claim; host bare → detached execute. */
@@ -267,7 +311,7 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
       this.invoke(name, decoration.ui, pick.session, { via: 'menu', span: pick.span })
       return 'handled'
     }
-    if (desc.input !== undefined) return { claim: this.leadingClaim(desc, pick.session, claimToken(desc, this.t)) }
+    if (desc.input !== undefined) return { claim: this.leadingClaim(desc, pick.session, this.presentationOf(desc)?.token() ?? desc.name) }
     // Menu-pick execute consumes the trigger span before the detached run
     // (scoped event; the input owns the CAS guard).
     this.consumeVia(pick.session.sessionId, { via: 'menu', span: pick.span })
@@ -313,7 +357,7 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
    * attachments stay in place; nothing executes and nothing is dropped. An
    * action submits nothing and runs regardless.
    *
-   * A typed token is resolved through the localized claim tokens, so a line
+   * A typed token is resolved through the presentation aliases, so a line
    * written as `/计划` reaches the `plan` descriptor and executes as `/plan`.
    */
   private async matchEnter(

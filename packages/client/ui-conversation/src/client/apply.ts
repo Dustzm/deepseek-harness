@@ -126,6 +126,7 @@ interface FileCommandRegistry {
     name: string
     label(): string
     icon: typeof IconPaperclipOutlineRegular
+    placement: { section: 'add'; rank: number }
     available(session: { sessionId: SessionId }): boolean
     ui: { kind: 'action'; run(session: { sessionId: SessionId }): void }
   }): () => void
@@ -307,6 +308,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       name: 'file',
       label: () => t('input.file'),
       icon: IconPaperclipOutlineRegular,
+      placement: { section: 'add', rank: 10 },
       available: session => inputHub.canPickFiles(session.sessionId),
       ui: { kind: 'action', run: (session) => { inputHub.pickFiles(session.sessionId) } },
     }), 'ui-conversation: File action')
