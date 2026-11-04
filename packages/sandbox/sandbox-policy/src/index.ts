@@ -38,15 +38,22 @@ function resolveWorkspaceRoot(path: string): string {
   return path
 }
 
-/** Render the policy without claiming which capabilities are mounted. */
-function renderPolicyContext(policy: SandboxExecutionPolicy): string {
+/**
+ * Render the policy without claiming which capabilities are mounted.
+ * @param policy - the resolved policy to describe.
+ * @param sandboxName - name qualifying the policy and sandbox; empty renders the unqualified form.
+ * @returns the model-visible policy sentence.
+ */
+function renderPolicyContext(policy: SandboxExecutionPolicy, sandboxName: string): string {
+  const policyName = sandboxName === '' ? 'file policy' : `${sandboxName} file policy`
+  const sandbox = sandboxName === '' ? 'file sandbox' : `${sandboxName} file sandbox`
   switch (policy.mode) {
     case 'read-only':
-      return 'Current DSH file policy: read-only. Any available operation enforced by the DSH file sandbox cannot modify files in the standing mode. Do not refuse a required modification from this policy alone: try an available tool normally and follow any denial and escalation guidance it returns.'
+      return `Current ${policyName}: read-only. Any available operation enforced by the ${sandbox} cannot modify files in the standing mode. Do not refuse a required modification from this policy alone: try an available tool normally and follow any denial and escalation guidance it returns.`
     case 'workspace-write':
-      return `Current DSH file policy: workspace-write. Any available operation enforced by the DSH file sandbox may modify files under the session workspace: ${JSON.stringify(policy.workspaceRoot)}. Some platform temporary areas may also be writable.`
+      return `Current ${policyName}: workspace-write. Any available operation enforced by the ${sandbox} may modify files under the session workspace: ${JSON.stringify(policy.workspaceRoot)}. Some platform temporary areas may also be writable.`
     case 'danger-full-access':
-      return 'Current DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations.'
+      return `Current ${policyName}: danger-full-access. The ${sandbox} does not restrict file modifications by available operations.`
     /* v8 ignore next 4 -- SandboxMode is a typed same-process closed union; this branch is only the static exhaustiveness guard. */
     default: {
       const mode: never = policy.mode
@@ -76,6 +83,12 @@ export interface Config {
    * `process.cwd()`). Normal agent calls use their session cwd instead.
    */
   workspaceRoot?: string
+  /**
+   * Name qualifying the model-visible policy context, as in `Current DSH file policy` and
+   * `the DSH file sandbox` (default: `DSH`). An empty string renders the unqualified
+   * `Current file policy` and `the file sandbox`.
+   */
+  sandboxName?: string
 }
 
 /** Inputs that select the sandbox policy for one capability call. */
@@ -114,6 +127,7 @@ export class SandboxPolicyService extends Service {
     // No schema default: process.cwd() is resolved in the constructor so the
     // stored root is always absolute regardless of how it was supplied.
     workspaceRoot: z.string(),
+    sandboxName: z.string().default('DSH'),
   })
 
   static inject = ['sessionProjections']
@@ -122,6 +136,8 @@ export class SandboxPolicyService extends Service {
   readonly defaultMode: SandboxMode
   /** The absolute `workspace-write` fallback root for calls without a session cwd. */
   readonly workspaceRoot: string
+  /** Name qualifying the model-visible policy context; empty renders the unqualified form. */
+  readonly sandboxName: string
   constructor(ctx: Context, config: Config) {
     super(ctx, 'sandboxPolicy')
     // schemastery (static Config) already filled `mode`; the cast records that
@@ -129,6 +145,8 @@ export class SandboxPolicyService extends Service {
     // the process cwd is real branching, resolved absolute either way.
     this.defaultMode = config.mode as SandboxMode
     this.workspaceRoot = resolveWorkspaceRoot(config.workspaceRoot ?? process.cwd())
+    // schemastery (static Config) already filled `sandboxName`.
+    this.sandboxName = config.sandboxName as string
 
     ctx.sessionProjections.register({
       key: 'sandboxMode',
@@ -146,7 +164,7 @@ export class SandboxPolicyService extends Service {
           const session = context.agent?.session
           return session === undefined
             ? ''
-            : renderPolicyContext(this.resolve({ session }))
+            : renderPolicyContext(this.resolve({ session }), this.sandboxName)
         },
       })
     })
