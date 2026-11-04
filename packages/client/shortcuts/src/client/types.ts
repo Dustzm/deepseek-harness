@@ -135,4 +135,12 @@ export interface Shortcuts {
    * @returns disposer removing the binding and catalog entry.
    */
   register(command: ShortcutCommand): () => void
+  /**
+   * Take over a registered command's action; its id, labels, defaults, saved binding, regions, and modals are unchanged.
+   * Mount order is free: the most recent mounted takeover resolves the command, and disposal restores the previous one.
+   * @param id - command whose action is replaced.
+   * @param resolve - replacement target resolver.
+   * @returns idempotent disposer restoring the previous resolver.
+   */
+  override(id: ShortcutCommandId, resolve: ShortcutCommand['resolve']): () => void
 }

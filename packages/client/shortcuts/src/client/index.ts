@@ -80,6 +80,10 @@ export default class ShortcutsService extends Service implements Shortcuts {
     return () => { off(); this.syncDefinitions() }
   }
 
+  override(...args: Parameters<Shortcuts['override']>): () => void {
+    return this.registry.override(...args)
+  }
+
   registerFixed(command: Parameters<Shortcuts['registerFixed']>[0]): () => void {
     const off = this.registry.registerFixed(command)
     this.syncDefinitions()

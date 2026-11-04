@@ -212,3 +212,23 @@ it.each(['macos', 'windows'] as const)('keeps %s priority identical before savin
   }
   expect(run).toHaveBeenCalledTimes(18)
 })
+
+it('lets a takeover resolve a command through keys and menus, independent of mount order, and restores on disposal', () => {
+  const registry = new ShortcutRegistry('desktop', 'macos')
+  const id = 'test.toggle' as ShortcutCommandId
+  const owner = vi.fn(), first = vi.fn(), latest = vi.fn()
+  const disposeFirst = registry.override(id, () => ({ status: 'handled', run: first }))
+  registry.register(command({ resolve: () => ({ status: 'handled', run: owner }) }))
+  const disposeLatest = registry.override(id, () => ({ status: 'handled', run: latest }))
+  expect(registry.dispatch(gesture, context, vi.fn())).toEqual({ status: 'handled', commandId: id })
+  registry.invoke(id, context)
+  expect(latest).toHaveBeenCalledTimes(2)
+  expect(registry.catalog.getSnapshot().map(row => [row.id, row.label, row.keys])).toEqual([[id, 'Toggle', ['⌘', 'B']]])
+  disposeLatest()
+  disposeLatest()
+  registry.dispatch(gesture, context, vi.fn())
+  expect(first).toHaveBeenCalledOnce()
+  disposeFirst()
+  registry.dispatch(gesture, context, vi.fn())
+  expect([owner.mock.calls.length, latest.mock.calls.length]).toEqual([1, 2])
+})
