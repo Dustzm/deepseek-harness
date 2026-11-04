@@ -31,6 +31,7 @@
 | 快捷键命令接管 `ctx.shortcuts.override(id, resolve)` | 通用扩展接口 | `packages/client/shortcuts`（`src/client/registry.ts`、`types.ts`、`index.ts`，测试 `tests/registry.client.spec.ts`，中英 README） | 同一默认键位只能注册一个命令，冲突直接报错，下游想让已有快捷键（如 ⌘K 的 `session.search`）打开自己的界面，只能改原注册方；接管只替换操作，ID、名称、默认值与用户改过的键位仍归原命令，释放后恢复，没有接管时行为不变 | 上游提供等价接口后可去掉 |
 | 设置导航 `ctx.settingsNavigation`（`sections`、`openSection(id)`、`SectionIcon`） | 通用扩展接口 | `packages/client/ui-settings-general`（`src/client/navigation.ts`、`section-icons.tsx`、`index.ts`、`SettingsRoot.tsx`，测试 `tests/shell.client.spec.ts`，中英 README） | 设置窗只能整体打开，分区选择在外壳私有的 store 里，导航图标按 id 写死在组件里，面板外的功能（如全局搜索）列不出分区、打不开到某个分区、也画不出与导航一致的图标；新增服务复用外壳同一份分区投影与图标逻辑，外壳行为不变 | 上游提供等价接口后可去掉 |
 | 沙箱策略上下文的名称 `sandbox-policy` 配置 `sandboxName`（默认 `DSH`，空字符串渲染为不带限定的 `Current file policy` / `the file sandbox`） | 通用扩展接口 | `packages/sandbox/sandbox-policy`（`src/index.ts`、测试 `tests/policy.spec.ts`、中英 README、`docs/config-catalog` 重新生成） | 每轮注入模型的运行时上下文写死「Current DSH file policy … the DSH file sandbox」，下游无法去掉产品名；新增可选名称，默认值保持上游文案不变 | 上游提供等价配置后可去掉 |
+| 目标条带的读数扩展位 `goal.bar.meta` | 通用扩展接口 | `packages/client/ui-goal`（`src/client/index.ts`、`GoalBar.tsx`、测试、中英 README） | 输入框上方的目标条带是写死的组件，下游无法在操作按钮旁加耗时之类的读数；新增 list 扩展位，条目收到目标快照与激活状态，空列表时条带不变 | 上游提供等价扩展位后可去掉 |
 
 ## 核心仓库如何使用这些改动
 

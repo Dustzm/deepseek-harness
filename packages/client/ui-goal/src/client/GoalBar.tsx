@@ -1,7 +1,8 @@
 /**
  * GoalBar: the goal indicator docked above the message composer (input dock
  * strip). A present goal shows a goal glyph, a phase label, the truncated
- * objective, and icon actions — resume when active-disarmed or paused, edit
+ * objective, optional meta readouts contributed through the `goal.bar.meta`
+ * slot, and icon actions — resume when active-disarmed or paused, edit
  * (inline form in the same strip), and clear. Goal creation lives on the
  * `/goal` command, not here: loading (undefined), no goal (null), and complete
  * goals render nothing. Durable state arrives as the projected whole snapshot;
@@ -9,12 +10,13 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import type { GoalActivation, GoalSnapshot } from '@deepseek-ai/dsh-goal/client'
 import {
   IconCheckOutlineRegular, IconCloseOutlineRegular, IconEditOutlineRegular, IconGoalOutlineRegular,
   IconPauseOutlineRegular, IconPlayOutlineRegular, IconTrashOutlineRegular, InlineEditor, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { InjectFace, PropsLocale, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsLocale, PropsRenderSlots, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { GoalActionResult, GoalBarActions, GoalBarInjected } from './slots.ts'
 import type { GoalKey } from './locales.ts'
 import css from './GoalBar.module.css'
@@ -24,6 +26,11 @@ export interface GoalBarProps extends GoalBarActions {
   goal: GoalSnapshot | null | undefined
   /** Process-local continuation activation; absent while the live read is pending. */
   activation?: GoalActivation
+  /**
+   * Compact readouts placed before the icon actions of the display strip, as
+   * direct flex items of the strip; never shown while editing.
+   */
+  meta?: ReactNode
 }
 
 /** Strip label keys per visible phase; complete goals render nothing. */
@@ -39,7 +46,7 @@ function activeLabel(activation: GoalActivation | undefined, t: TranslateNS<'goa
   return t(PHASE_LABELS.active)
 }
 
-export function GoalBar({ goal, activation, onEdit, onPause, onResume, onClear, t }: GoalBarProps & PropsLocale<'goal'>) {
+export function GoalBar({ goal, activation, meta, onEdit, onPause, onResume, onClear, t }: GoalBarProps & PropsLocale<'goal'>) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const [pending, setPending] = useState(false)
@@ -137,6 +144,7 @@ export function GoalBar({ goal, activation, onEdit, onPause, onResume, onClear, 
         <span className={css.label}>{label}</span>
         <span className={css.objective}>{goal.objective}</span>
         {actionError !== null && <span className={css.error} role="alert">{actionError}</span>}
+        {meta}
         <div className={css.actions}>
           {goal.phase === 'active' && activation === 'armed' && (
             <Tooltip portal label={t('action.pause')} side="bottom" delayMs={500}>
@@ -174,15 +182,16 @@ export function GoalBar({ goal, activation, onEdit, onPause, onResume, onClear, 
   )
 }
 
-/** Full props of the dock entry: InputZone owner share + injected verbs/activation hook + the locale seat. */
+/** Full props of the dock entry: InputZone owner share + meta child slot + injected verbs/activation hook + the locale seat. */
 export type GoalDockProps =
   import('@deepseek-ai/dsh-client-ui-slots').PropsRuntime<'conversation.input.dock'>
+  & PropsRenderSlots<'goal.bar.meta'>
   & InjectFace<GoalBarInjected>
   & PropsLocale<'goal'>
 
-/** Dock adapter: overlays process-local activation on the durable goal projection. */
+/** Dock adapter: overlays process-local activation on the durable goal projection and renders the meta slot. */
 export function GoalDock({
-  useProjection, useGoalActivation, onEdit, onPause, onResume, onClear, t,
+  useProjection, useGoalActivation, renderSlot, onEdit, onPause, onResume, onClear, t,
 }: GoalDockProps) {
   const projection = useProjection('goal')
   const goal = projection === undefined || projection === null ? projection : projection.goal
@@ -192,10 +201,16 @@ export function GoalDock({
     next.id === goalId && next.revision === revision ? next.activation : undefined
   ))
 
+  // Only a visible strip renders the slot, so meta entries never mount for absent or complete goals.
+  const meta = goal === undefined || goal === null || goal.phase === 'complete'
+    ? undefined
+    : renderSlot('goal.bar.meta', { goal, ...activation === undefined ? {} : { activation } })
+
   return (
     <GoalBar
       goal={goal}
       {...activation === undefined ? {} : { activation }}
+      {...meta === undefined ? {} : { meta }}
       onEdit={onEdit}
       onPause={onPause}
       onResume={onResume}
