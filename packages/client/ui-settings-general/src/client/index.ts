@@ -14,7 +14,7 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 // Type-only: pulls the ctx.modules merge.
 import type {} from '@deepseek-ai/dsh-client-modules/client'
-import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
+import { resolveSlotLabel, type HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import { closeTopModal } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: the settings slot declarations plus the ctx.configForms Context
 // merge. Cross-plugin collaboration goes through the service, never a value
@@ -30,6 +30,8 @@ import type {
 } from './shell-contract.ts'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { createSettingsShellStore } from './shell-store.ts'
+import type { SettingsNavigation } from './navigation.ts'
+import { createSectionIcon } from './section-icons.tsx'
 import { SettingsRoot } from './SettingsRoot.tsx'
 import { DesktopUpdateBadge } from './DesktopUpdateIndicator.tsx'
 import type { DesktopUpdateBridge } from '../types.ts'
@@ -54,6 +56,9 @@ export type { SettingsDocumentActionInjected, SettingsDocumentActionProps } from
 export type { SettingsDocumentState } from './settings-document-store.ts'
 export { SettingsDocumentStore } from './settings-document-store.ts'
 export type { SettingsKey } from './locales.ts'
+export type { SettingsNavigation } from './navigation.ts'
+export type { SectionIconProps } from './section-icons.tsx'
+export type { SettingsSectionRow } from './shell-contract.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -130,8 +135,47 @@ export function apply(ctx: ClientContext): void {
   let rowsVersion = -1
   let rowsRevision = -1
   let rows: readonly SettingsSectionRow[] = []
+  const sections: HostObservable<readonly SettingsSectionRow[]> = {
+    getSnapshot: () => {
+      const version = ctx.slots.getVersion('settings.section')
+      const revision = ctx.locale.getSnapshot().revision
+      if (version !== rowsVersion || revision !== rowsRevision) {
+        rowsVersion = version
+        rowsRevision = revision
+        rows = ctx.slots.entries('settings.section')
+          .map(e => ({
+            /* v8 ignore next -- list-slot registration requires id (SlotCore rejects an entry without one) */
+            id: e.options.id ?? '',
+            order: e.options.order ?? 0,
+            label: resolveSlotLabel(e.options.label) ?? '',
+          }))
+          .sort((a, b) => a.order - b.order)
+      }
+      return rows
+    },
+    subscribe: (listener) => {
+      const offLedger = ctx.slots.subscribe('settings.section', listener)
+      const offLocale = ctx.locale.subscribe(listener)
+      return () => {
+        offLedger()
+        offLocale()
+      }
+    },
+  }
   let onboardingVersion = -1
   let onboardingSteps: readonly SettingsOnboardingStep[] = []
+  // The mounted shell's store; `settingsNavigation.openSection` drives it like the nav rail does.
+  let shell: ReturnType<ReturnType<typeof createSettingsShellStore>['create']> | undefined
+  const navigation: SettingsNavigation = {
+    sections,
+    openSection: (id) => {
+      if (!sections.getSnapshot().some(row => row.id === id)) throw new Error(`settingsNavigation.openSection: section "${id}" is not registered`)
+      if (shell === undefined) throw new Error('settingsNavigation.openSection: the settings shell is not mounted')
+      shell.actions.openSection(id)
+    },
+    SectionIcon: createSectionIcon(ctx),
+  }
+  ctx.provide('settingsNavigation', navigation)
   const shellInjected = (): SettingsRootInjected => ({
     openDesktopUpdate: () => { desktopUpdate.open() },
     reconnect: () => { connection.reconnect() },
@@ -139,33 +183,7 @@ export function apply(ctx: ClientContext): void {
       shortcuts: ctx.shortcuts.catalog,
       desktopUpdate: desktopUpdate.store,
       connectionState: connection.state,
-      sections: {
-        getSnapshot: () => {
-          const version = ctx.slots.getVersion('settings.section')
-          const revision = ctx.locale.getSnapshot().revision
-          if (version !== rowsVersion || revision !== rowsRevision) {
-            rowsVersion = version
-            rowsRevision = revision
-            rows = ctx.slots.entries('settings.section')
-              .map(e => ({
-                /* v8 ignore next -- list-slot registration requires id (SlotCore rejects an entry without one) */
-                id: e.options.id ?? '',
-                order: e.options.order ?? 0,
-                label: resolveSlotLabel(e.options.label) ?? '',
-              }))
-              .sort((a, b) => a.order - b.order)
-          }
-          return rows
-        },
-        subscribe: (listener) => {
-          const offLedger = ctx.slots.subscribe('settings.section', listener)
-          const offLocale = ctx.locale.subscribe(listener)
-          return () => {
-            offLedger()
-            offLocale()
-          }
-        },
-      },
+      sections,
       onboardingSteps: {
         getSnapshot: () => {
           const version = ctx.slots.getVersion('settings.onboarding')
@@ -188,6 +206,7 @@ export function apply(ctx: ClientContext): void {
   ctx.slots.inject('sidebar.settings', () => {
     const shellHandle = createSettingsShellStore()
     const shellInstance = shellHandle.create()
+    shell = shellInstance
     const shellStore: typeof shellHandle = { ...shellHandle, create: () => shellInstance }
     const disposeCommand = ctx.shortcuts.register({
       id: 'settings.open' as ShortcutCommandId, label: () => t('shortcut.open'), aliases: ['settings', 'preferences'],
@@ -224,7 +243,11 @@ export function apply(ctx: ClientContext): void {
       },
       inject: shellInjected,
     }, SettingsRoot)
-    return () => { disposeCommand(); disposeSlot() }
+    return () => {
+      disposeCommand()
+      disposeSlot()
+      if (shell === shellInstance) shell = undefined
+    }
   })
 
   ctx.slots.inject('settings.trigger', () =>
