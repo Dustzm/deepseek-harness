@@ -42,10 +42,9 @@ function outputText(blocks: ContentBlock[]): string {
     .join('')
 }
 
-/** A short display label derived from the prompt when the script passes none. */
+/** A short display label from the prompt's first non-blank line, used when the script passes no label. */
 function defaultLabel(prompt: string): string {
-  const newline = prompt.indexOf('\n')
-  const line = newline === -1 ? prompt : prompt.slice(0, newline)
+  const line = prompt.split('\n').find(candidate => candidate.trim() !== '')?.trim() ?? ''
   return line.length <= 48 ? line : `${line.slice(0, 47)}…`
 }
 
@@ -185,7 +184,7 @@ export class WorkflowExecution {
           ...opts.schema !== undefined ? { schema: opts.schema } : {},
           ...opts.provider !== undefined ? { provider: opts.provider } : {},
           ...opts.model !== undefined ? { model: opts.model } : {},
-          ...opts.label !== undefined ? { label: opts.label } : {},
+          label,
         })
       } catch (error: unknown) {
         throw new WorkflowError(`agent() could not start a child: ${renderThrown(error)}`, 'AGENT_START', { cause: error })
@@ -273,8 +272,10 @@ export class WorkflowExecution {
         throw new WorkflowError(`agent() schema is outside the supported subset — ${error.message}`, 'UNSUPPORTED_SCHEMA', { cause: error })
       }
     }
+    // A blank label only affects display, so it falls back to the prompt-derived label.
+    const label = typeof record.label === 'string' && record.label.trim() !== '' ? record.label : undefined
     return {
-      ...record.label !== undefined ? { label: record.label as string } : {},
+      ...label !== undefined ? { label } : {},
       ...record.phase !== undefined ? { phase: record.phase as string } : {},
       ...record.provider !== undefined ? { provider: record.provider as string } : {},
       ...record.model !== undefined ? { model: record.model as string } : {},

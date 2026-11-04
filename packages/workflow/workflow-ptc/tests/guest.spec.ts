@@ -251,6 +251,20 @@ describe('workflow child results', () => {
       { info: { label: `${'x'.repeat(47)}…`, phase: 'default' } },
       { info: { label: 'short', phase: 'override' } },
     ])
+    expect(test.requests.map(request => request.label)).toEqual([`${'x'.repeat(47)}…`, 'short'])
+  })
+
+  it('names the child after the prompt when the label is blank or the prompt opens with blank lines', async () => {
+    const test = fixture(`
+      await agent('hello', { label: '' })
+      await agent('hello', { label: '  ' })
+      await agent(${JSON.stringify('\n   \n  indented first line\nsecond')})
+      return await agent(${JSON.stringify(' \n ')})
+    `)
+    await expect(runWorkflowGuest(test.host)).resolves.toMatchObject({ stopReason: 'completed' })
+    const labels = ['hello', 'hello', 'indented first line', '']
+    expect(test.requests.map(request => request.label)).toEqual(labels)
+    expect(test.events.filter(event => event.type === 'agent-start').map(event => event.info.label)).toEqual(labels)
   })
 
   it('propagates child-start infrastructure failure through a combinator', async () => {
