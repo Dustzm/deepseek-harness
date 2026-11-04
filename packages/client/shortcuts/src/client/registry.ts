@@ -16,6 +16,8 @@ export class ShortcutRegistry {
   private readonly fixedCommands = new Map<ShortcutCommandId, ShortcutFixedCommand>()
   private readonly conflicts = new Map<string, ShortcutCommand>()
   private readonly bindings = new Map<string, ShortcutCommand>()
+  /** Action takeovers by command id; the most recent mounted entry resolves the command. */
+  private readonly overrides = new Map<ShortcutCommandId, ShortcutCommand['resolve'][]>()
   private readonly state
   /** Effective localized rows derived from the accepted configuration. */
   readonly catalog
@@ -110,6 +112,31 @@ export class ShortcutRegistry {
   }
 
   /**
+   * Take over a command's action while its id, labels, defaults, saved binding, regions, and modals stay with the owner.
+   * The takeover may mount before or after the command; the most recent mounted takeover resolves it.
+   * @param id - command whose action is replaced.
+   * @param resolve - replacement target resolver.
+   * @returns idempotent disposer restoring the previous resolver.
+   */
+  override(id: ShortcutCommandId, resolve: ShortcutCommand['resolve']): () => void {
+    const stack = this.overrides.get(id) ?? []
+    stack.push(resolve)
+    this.overrides.set(id, stack)
+    return () => {
+      const current = this.overrides.get(id)
+      const index = current?.lastIndexOf(resolve) ?? -1
+      if (current === undefined || index === -1) return
+      current.splice(index, 1)
+      if (current.length === 0) this.overrides.delete(id)
+    }
+  }
+
+  private resolve(command: ShortcutCommand, context: ShortcutContext): ReturnType<ShortcutCommand['resolve']> {
+    const takeover = this.overrides.get(command.id)?.at(-1)
+    return (takeover ?? command.resolve)(context)
+  }
+
+  /**
    * Recompute effective bindings when preferences, commands, or locale change.
    * @param config - accepted configuration, defaulting to the current snapshot.
    */
@@ -140,7 +167,7 @@ export class ShortcutRegistry {
   invoke(id: ShortcutCommandId, context: ShortcutContext): void {
     const command = this.commands.get(id)
     if (command === undefined || (context.modal !== null && !command.modals.includes(context.modal))) return
-    const result = command.resolve({ ...context, source: 'menu' })
+    const result = this.resolve(command, { ...context, source: 'menu' })
     if (result.status === 'handled') result.run()
   }
 
@@ -170,7 +197,7 @@ export class ShortcutRegistry {
       consume()
       return { status: 'blocked', commandId: command.id, reason: 'modal' }
     }
-    const resolution = command.resolve(context)
+    const resolution = this.resolve(command, context)
     if (resolution.status === 'pass') return resolution
     consume()
     if (resolution.status === 'blocked') return { ...resolution, commandId: command.id }

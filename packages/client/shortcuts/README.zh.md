@@ -27,7 +27,7 @@ Windows 在修饰键之间及第一个普通键之前使用 ` + `。Windows 和 
 <a id="use-this-package"></a>
 ## 使用此包
 
-Web 应用 bundle 自动挂载此包。功能插件在 `ctx.effect()` 中通过 `ctx.shortcuts` 注册命令。每个命令为 `desktop:macos`、`desktop:windows`、`desktop:linux`、`web:macos`、`web:windows` 和 `web:linux` 显式声明默认值；省略的配置不绑定按键。服务接收物理 `code`，按设备展开 `primary`，并拒绝重复 ID 和任一支持配置中重叠的默认键位。同一可观察目录提供名称、键帽、已修改标记和键位冲突。命令 owner 在执行操作前解析当前目标。
+Web 应用 bundle 自动挂载此包。功能插件在 `ctx.effect()` 中通过 `ctx.shortcuts` 注册命令。每个命令为 `desktop:macos`、`desktop:windows`、`desktop:linux`、`web:macos`、`web:windows` 和 `web:linux` 显式声明默认值；省略的配置不绑定按键。服务接收物理 `code`，按设备展开 `primary`，并拒绝重复 ID 和任一支持配置中重叠的默认键位。同一可观察目录提供名称、键帽、已修改标记和键位冲突。命令 owner 在执行操作前解析当前目标。其他插件可在 `ctx.effect()` 中通过 `override(id, resolve)` 接管已注册命令的操作：ID、名称、默认值、已保存绑定、区域和模态仍归 owner；按键与原生菜单执行最近挂载的接管，与挂载顺序无关；释放后恢复上一个解析函数。
 
 功能插件通过 `registerFixed()` 贡献只读序列，通过 `observeFixedInput()` 观察局部控件处理后的输入。固定操作行随所属注册和语言变化；owner 可使用 `application` 展示分组，操作仍不可编辑。每个操作至少声明一个物理按键组合，不保存覆盖配置。这些组合参与冲突校验，不能分配给可编辑命令。Host 的 `stopSequenceMs` 配置控制连续两次 Esc 的最大间隔，默认为 500 毫秒，只接受 1 至 2,147,483,646 的整数，确保过期计时不超过浏览器定时器上限；页面加载时采用已校验的值。
 
