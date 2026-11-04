@@ -7,7 +7,7 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { IconProps } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
-import { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
+import type { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
 import type { CommandPresentation, MenuPlacement } from './contract.ts'
 import { en, zh } from './locales.ts'
 
@@ -39,7 +39,8 @@ export function builtinPresentations(t: TranslateNS<'command'>): readonly Comman
   return (Object.keys(BUILTINS) as Array<keyof typeof BUILTINS>).map((name) => {
     const face = BUILTINS[name]
     return {
-      definitionId: CommandDefinitionId(face.definitionId),
+      // The ids are the first-party packages' registered definition ids.
+      definitionId: face.definitionId as CommandDefinitionId,
       label: () => t(`label.${name}`),
       description: () => t(`description.${name}`),
       icon: face.icon,
