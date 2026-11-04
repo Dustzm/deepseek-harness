@@ -232,3 +232,107 @@ it('lets a takeover resolve a command through keys and menus, independent of mou
   registry.dispatch(gesture, context, vi.fn())
   expect([owner.mock.calls.length, latest.mock.calls.length]).toEqual([1, 2])
 })
+
+describe('takeover modals and catalog state', () => {
+  const id = 'test.toggle' as ShortcutCommandId
+  const webCommand = (run: () => void) => command({
+    defaults: { 'web:macos': { code: 'KeyB', modifiers: ['primary', 'alt'] } },
+    resolve: () => ({ status: 'handled', run }),
+  })
+  const webGesture = { ...gesture, alt: true }
+
+  it('admits a takeover modal on Web keyboard input only while that takeover is the most recent one', () => {
+    const registry = new ShortcutRegistry('web', 'macos')
+    const owner = vi.fn(), takeover = vi.fn()
+    registry.register(webCommand(owner))
+    const resolve = vi.fn<ShortcutCommand['resolve']>(() => ({ status: 'handled', run: takeover }))
+    const dispose = registry.override(id, resolve, { modals: ['palette'] })
+
+    expect(registry.dispatch(webGesture, { ...context, modal: 'palette' }, vi.fn())).toEqual({ status: 'handled', commandId: id })
+    expect(resolve).toHaveBeenCalledWith({ ...context, modal: 'palette' })
+    expect(takeover).toHaveBeenCalledOnce()
+    expect(registry.dispatch(webGesture, { ...context, modal: 'settings' }, vi.fn()))
+      .toEqual({ status: 'blocked', commandId: id, reason: 'modal' })
+
+    const plain = registry.override(id, () => ({ status: 'handled', run: takeover }))
+    expect(registry.dispatch(webGesture, { ...context, modal: 'palette' }, vi.fn()))
+      .toEqual({ status: 'blocked', commandId: id, reason: 'modal' })
+    plain()
+    dispose()
+    expect(registry.dispatch(webGesture, { ...context, modal: 'palette' }, vi.fn()))
+      .toEqual({ status: 'blocked', commandId: id, reason: 'modal' })
+    expect(registry.dispatch(webGesture, context, vi.fn()).status).toBe('handled')
+    expect([owner.mock.calls.length, takeover.mock.calls.length]).toEqual([1, 1])
+  })
+
+  it('merges owner and takeover modals for keys and menus', () => {
+    const registry = new ShortcutRegistry('web', 'macos')
+    const owner = vi.fn(), takeover = vi.fn()
+    registry.register(command({ ...webCommand(owner), modals: ['settings'] }))
+    registry.override(id, () => ({ status: 'handled', run: takeover }), { modals: ['palette'] })
+    for (const modal of ['settings', 'palette']) {
+      expect(registry.dispatch(webGesture, { ...context, modal }, vi.fn()).status).toBe('handled')
+    }
+    registry.invoke(id, { ...context, modal: 'palette' })
+    expect(takeover).toHaveBeenCalledTimes(3)
+    expect(owner).not.toHaveBeenCalled()
+  })
+
+  it.each([['desktop', 'macos'], ['desktop', 'linux']] as const)('runs a %s/%s menu takeover in its declared modal only', (runtime, platform) => {
+    const registry = new ShortcutRegistry(runtime, platform)
+    const declared = vi.fn(), undeclared = vi.fn()
+    registry.register(command())
+    const dispose = registry.override(id, () => ({ status: 'handled', run: declared }), { modals: ['palette'] })
+    registry.invoke(id, { ...context, modal: 'palette' })
+    expect(declared).toHaveBeenCalledOnce()
+    dispose()
+    registry.override(id, () => ({ status: 'handled', run: undeclared }))
+    registry.invoke(id, { ...context, modal: 'palette' })
+    expect(undeclared).not.toHaveBeenCalled()
+  })
+
+  it('blocks a declared takeover modal for other Linux Desktop modals', () => {
+    const registry = new ShortcutRegistry('desktop', 'linux')
+    const run = vi.fn()
+    registry.register(command({ defaults: { 'desktop:linux': { code: 'KeyB', modifiers: ['control'] } } }))
+    registry.override(id, () => ({ status: 'handled', run }), { modals: ['palette'] })
+    const linuxGesture = { ...gesture, meta: false, control: true }
+    expect(registry.dispatch(linuxGesture, { ...context, modal: 'palette' }, vi.fn()).status).toBe('handled')
+    expect(registry.dispatch(linuxGesture, { ...context, modal: 'settings' }, vi.fn()).status).toBe('blocked')
+    expect(run).toHaveBeenCalledOnce()
+  })
+
+  it('publishes overridden while any takeover is mounted and releases idempotently', () => {
+    const registry = new ShortcutRegistry('desktop', 'macos')
+    registry.register(command())
+    const listener = vi.fn()
+    registry.catalog.subscribe(listener)
+    expect(registry.catalog.getSnapshot()[0]?.overridden).toBe(false)
+
+    const before = registry.catalog.getSnapshot()
+    const first = registry.override(id, () => ({ status: 'pass' }))
+    const second = registry.override(id, () => ({ status: 'pass' }))
+    expect(registry.catalog.getSnapshot()).not.toBe(before)
+    expect(registry.catalog.getSnapshot()[0]?.overridden).toBe(true)
+    expect(listener).toHaveBeenCalled()
+
+    second()
+    expect(registry.catalog.getSnapshot()[0]?.overridden).toBe(true)
+    first()
+    expect(registry.catalog.getSnapshot()[0]?.overridden).toBe(false)
+    const released = registry.catalog.getSnapshot()
+    listener.mockClear()
+    first()
+    second()
+    expect(registry.catalog.getSnapshot()).toBe(released)
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('reports overridden for a takeover mounted before its command and while configuration is loading', () => {
+    const registry = new ShortcutRegistry('desktop', 'macos', initialShortcutConfig())
+    registry.override(id, () => ({ status: 'pass' }))
+    registry.register(command())
+    expect(registry.config.getSnapshot().status).toBe('loading')
+    expect(registry.catalog.getSnapshot()[0]).toMatchObject({ id, overridden: true })
+  })
+})

@@ -31,7 +31,7 @@ const choices: TerminalLaunchShells = {
 type GuideShortcut = Pick<ShortcutCatalogEntry, 'keys' | 'aria'>
 const catalogEntry = (shortcut: GuideShortcut): ShortcutCatalogEntry => ({
   id: 'terminal.new' as ShortcutCommandId, label: en.new, aliases: [], binding: null,
-  modified: false, conflicts: [], issue: null, ...shortcut,
+  modified: false, conflicts: [], issue: null, overridden: false, ...shortcut,
 })
 
 function mount(description: string | undefined = en.description, shortcut?: GuideShortcut) {

@@ -153,7 +153,7 @@ describe('GuideBody', () => {
   it('shows configured guide bindings and omits cleared key labels', () => {
     for (const keys of [['Ctrl', 'P'], []]) {
       const entry: ShortcutCatalogEntry = { id: 'workspace.files' as never, label: 'Files', aliases: [],
-        binding: null, keys, aria: keys.length ? 'Control+P' : undefined, modified: true, conflicts: [], issue: null }
+        binding: null, keys, aria: keys.length ? 'Control+P' : undefined, modified: true, conflicts: [], issue: null, overridden: false }
       const { view } = mountGuide([{ ...box('files', 10), commandId: entry.id }], undefined, [entry])
       expect(view.getByRole('button').getAttribute('aria-keyshortcuts')).toBe(entry.aria ?? null)
       expect(view.getByRole('button').textContent).toBe(`files title${keys.join('')}`)

@@ -52,11 +52,11 @@ it.each(['macos', 'windows'] as const)('shows the reference, filters labels and 
   hostApply()
   const store = createShortcutsStore().create()
   const catalog = createSnapshotStore<readonly ShortcutCatalogEntry[]>([
-    { id: 'shortcuts.open' as ShortcutCommandId, label: 'Open shortcuts', aliases: ['shortcuts'], binding: { code: 'Slash', modifiers: [platform === 'macos' ? 'meta' : 'control'] }, modified: false, conflicts: [], issue: null,
+    { id: 'shortcuts.open' as ShortcutCommandId, label: 'Open shortcuts', aliases: ['shortcuts'], binding: { code: 'Slash', modifiers: [platform === 'macos' ? 'meta' : 'control'] }, modified: false, conflicts: [], issue: null, overridden: false,
       keys: platform === 'macos' ? ['⌘', '/'] : ['Ctrl', '+', '/'], aria: platform === 'macos' ? 'Meta+/' : 'Control+/' },
-    { id: 'settings.open' as ShortcutCommandId, label: 'Open settings', aliases: ['preferences'], binding: null, modified: false, conflicts: [], issue: null, keys: [], aria: undefined },
+    { id: 'settings.open' as ShortcutCommandId, label: 'Open settings', aliases: ['preferences'], binding: null, modified: false, conflicts: [], issue: null, overridden: false, keys: [], aria: undefined },
     { id: 'sidebar.left.toggle' as ShortcutCommandId, label: 'Toggle left sidebar', aliases: ['sidebar', 'toggle left sidebar'],
-      binding: { code: 'KeyB', modifiers: [platform === 'macos' ? 'meta' : 'control'] }, modified: false, conflicts: [], issue: null,
+      binding: { code: 'KeyB', modifiers: [platform === 'macos' ? 'meta' : 'control'] }, modified: false, conflicts: [], issue: null, overridden: false,
       keys: platform === 'macos' ? ['⌘', 'B'] : ['Ctrl', '+', 'B'], aria: platform === 'macos' ? 'Meta+B' : 'Control+B' },
   ])
   const config = createSnapshotStore({ ...initialShortcutConfig(), status: 'ready' as const })
@@ -120,9 +120,9 @@ it('saves individual edits and disables changes when configuration cannot be rea
   const store = createShortcutsStore().create()
   const catalog = createSnapshotStore<readonly ShortcutCatalogEntry[]>([
     { id: 'shortcuts.open' as ShortcutCommandId, label: 'Open shortcuts', aliases: [], binding: null, modified: true,
-      conflicts: ['other.action' as ShortcutCommandId], issue: null, keys: [], aria: undefined },
+      conflicts: ['other.action' as ShortcutCommandId], issue: null, overridden: false, keys: [], aria: undefined },
     { id: 'settings.open' as ShortcutCommandId, label: 'Open settings', aliases: [], binding: null, modified: true,
-      conflicts: [], issue: 'reserved', keys: [], aria: undefined },
+      conflicts: [], issue: 'reserved', overridden: false, keys: [], aria: undefined },
   ])
   const config = createSnapshotStore<ShortcutConfigSnapshot>(initialShortcutConfig())
   const edit = vi.fn(async () => ({ status: 'saved' as const, snapshot: config.getSnapshot() }))
@@ -159,7 +159,7 @@ function referenceFixture({ runtime = 'web', dictionary = en }: { runtime?: 'web
   const catalog = createSnapshotStore<readonly ShortcutCatalogEntry[]>([
     { id: 'settings.open' as ShortcutCommandId, label: 'Open settings', aliases: [],
       binding: { code: 'Comma', modifiers: ['shift', 'meta'] }, modified: false,
-      conflicts: [], issue: null, keys: ['⇧', '⌘', ','], aria: 'Shift+Meta+,' },
+      conflicts: [], issue: null, overridden: false, keys: ['⇧', '⌘', ','], aria: 'Shift+Meta+,' },
   ])
   const config = createSnapshotStore<ShortcutConfigSnapshot>({ ...initialShortcutConfig(), status: 'ready' })
   const fixedCatalog = createSnapshotStore<readonly ShortcutFixedCatalogEntry[]>([])

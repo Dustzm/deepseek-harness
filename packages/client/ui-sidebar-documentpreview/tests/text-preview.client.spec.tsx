@@ -596,7 +596,7 @@ describe('TextPreview — header controls', () => {
     const props = h.props(), info = props.useTabInfo()
     const view = render(<TextPreview {...props} useTabInfo={() => ({ ...info, tab: { ...info.tab,
       refreshShortcut: { id: 'page.refresh' as never, label: 'Refresh', aliases: [], binding: null,
-        keys: ['Ctrl', 'R'], aria: 'Control+R', modified: true, conflicts: [], issue: null },
+        keys: ['Ctrl', 'R'], aria: 'Control+R', modified: true, conflicts: [], issue: null, overridden: false },
     } })} />)
     await settle()
     expect(view.container.querySelector('[data-textpreview-tool="reload"]')?.getAttribute('aria-keyshortcuts')).toBe('Control+R')

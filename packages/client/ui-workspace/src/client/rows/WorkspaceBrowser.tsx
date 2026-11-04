@@ -949,7 +949,9 @@ export function WorkspaceBrowser({
 }: WorkspaceBrowserProps) {
   const home = useHostInfo(info => info.home)
   const shortcuts = useShortcuts(rows => rows)
-  const searchShortcut = shortcuts.find(row => row.id === 'session.search')
+  const searchRow = shortcuts.find(row => row.id === 'session.search')
+  // The button opens this list's own filter; a takeover owns the command's keys.
+  const searchShortcut = searchRow?.overridden === true ? undefined : searchRow
   const addShortcut = shortcuts.find(row => row.id === 'workspace.add')
   const shortcutState = useWorkspaceShortcuts(state => state)
   // Ordering remains live while the rail or search replaces the list body.
