@@ -161,7 +161,7 @@ describe('SandboxPolicyService', () => {
 })
 
 describe('sandbox:policy request context', () => {
-  async function promptMounted(config: { mode?: 'read-only' | 'workspace-write' | 'danger-full-access'; workspaceRoot?: string } = {}): Promise<Context> {
+  async function promptMounted(config: { mode?: 'read-only' | 'workspace-write' | 'danger-full-access'; workspaceRoot?: string; sandboxName?: string } = {}): Promise<Context> {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(SessionProjectionRegistry)
@@ -179,6 +179,19 @@ describe('sandbox:policy request context', () => {
     } as const
 
     expect(await policyContext(ctx, session(`sess-${mode}`, '/projects/../projects/current'))).toBe(expected[mode])
+  })
+
+  it.each([
+    ['read-only', 'Current file policy: read-only. Any available operation enforced by the file sandbox cannot modify files in the standing mode. Do not refuse a required modification from this policy alone: try an available tool normally and follow any denial and escalation guidance it returns.'],
+    ['danger-full-access', 'Current file policy: danger-full-access. The file sandbox does not restrict file modifications by available operations.'],
+  ] as const)('renders the unqualified %s policy when sandboxName is empty', async (mode, expected) => {
+    const ctx = await promptMounted({ mode, sandboxName: '' })
+    expect(await policyContext(ctx, session(`sess-unnamed-${mode}`, '/projects/current'))).toBe(expected)
+  })
+
+  it('qualifies the policy with a configured sandboxName', async () => {
+    const ctx = await promptMounted({ mode: 'workspace-write', sandboxName: 'Acme' })
+    expect(await policyContext(ctx, session('sess-named', '/projects/current'))).toBe(`Current Acme file policy: workspace-write. Any available operation enforced by the Acme file sandbox may modify files under the session workspace: ${JSON.stringify('/projects/current')}. Some platform temporary areas may also be writable.`)
   })
 
   it('keeps the complete rendered prompt byte-stable across TMPDIR changes', async () => {
