@@ -157,6 +157,7 @@ async function bench(options: {
       if (entry === undefined) return undefined
       return {
         ...entry.options,
+        children: entry.children,
         locale: entry.locale,
         inject: entry.inject as unknown as ((sessionId: SessionId) => GoalBarInjected) | undefined,
       }
@@ -228,7 +229,10 @@ describe('ui-goal browser plugin', () => {
   it('registers the GoalBar dock, command input Definition, and keyed Chat renderer', async () => {
     const b = await bench()
     await b.fiber.await()
-    expect(b.entry()).toMatchObject({ id: 'goal', order: 10, locale: 'goal' })
+    expect(b.entry()).toMatchObject({
+      id: 'goal', order: 10, locale: 'goal',
+      children: { 'goal.bar.meta': { kind: 'list', scope: 'session' } },
+    })
     expect(b.entry()?.inject).toBeTypeOf('function')
     expect(() => b.entry()!.inject!(sid('missing'))).toThrow(/unavailable/)
     expect(b.definitions().map(definition => definition.kind)).toEqual(['goal-command-input'])
@@ -350,11 +354,19 @@ describe('GoalDock adapter', () => {
       onClear: () => Promise.resolve({ ok: true, value: undefined }),
     }
     const t = makeTranslate(zh, commonZh)
+    const renderSlot = vi.fn((_key: string, owner: { goal: { objective: string } }) => (
+      <span data-testid="meta">{owner.goal.objective.length}</span>
+    ))
     const dockProps = (up: () => GoalProjection | null | undefined) =>
-      ({ useProjection: up, useGoalActivation, ...actions, t }) as unknown as Parameters<typeof GoalDock>[0]
+      ({ useProjection: up, useGoalActivation, renderSlot, ...actions, t }) as unknown as Parameters<typeof GoalDock>[0]
     const shown = render(<GoalDock {...dockProps(useProjection)} />)
     expect(shown.getByText('Ship it')).toBeTruthy()
+    expect(shown.getByTestId('meta').textContent).toBe('7')
+    expect(renderSlot).toHaveBeenLastCalledWith('goal.bar.meta', {
+      goal: projection.goal, activation: 'armed',
+    })
     cleanup()
+    renderSlot.mockClear()
 
     const empty = render(<GoalDock {...dockProps(() => null)} />)
     expect(empty.container.firstChild).toBeNull()
@@ -362,6 +374,7 @@ describe('GoalDock adapter', () => {
 
     const absent = render(<GoalDock {...dockProps(() => undefined)} />)
     expect(absent.container.firstChild).toBeNull()
+    expect(renderSlot).not.toHaveBeenCalled()
   })
 
   it('matches activation by goal id and revision from the injected hook', () => {
@@ -377,7 +390,7 @@ describe('GoalDock adapter', () => {
       onClear: () => Promise.resolve({ ok: true, value: undefined }),
     }
     const t = makeTranslate(zh, commonZh)
-    const props = { useProjection, useGoalActivation, ...actions, t } as unknown as Parameters<typeof GoalDock>[0]
+    const props = { useProjection, useGoalActivation, renderSlot: () => null, ...actions, t } as unknown as Parameters<typeof GoalDock>[0]
     const rendered = render(<GoalDock {...props} />)
     expect(rendered.getByText('已暂停的目标')).toBeTruthy()
     expect(screen.getByRole('button', { name: '恢复目标' })).toBeTruthy()

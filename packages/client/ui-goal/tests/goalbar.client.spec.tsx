@@ -246,4 +246,17 @@ describe('GoalBar', () => {
     fireEvent.click(screen.getByRole('button', { name: '清除目标' }))
     await waitFor(() => { expect(actions.onClear).toHaveBeenCalledTimes(2) })
   })
+
+  it('places meta readouts between the objective and the actions, and hides them while editing', () => {
+    const actions = makeActions()
+    render(<GoalBar goal={makeGoal()} meta={<span data-testid="meta">00:01:05</span>} {...actions} t={t} />)
+    const meta = screen.getByTestId('meta')
+    const edit = screen.getByRole('button', { name: '编辑目标' })
+    const objective = screen.getByText('Ship the redesign')
+    expect(objective.compareDocumentPosition(meta) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(meta.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    fireEvent.click(edit)
+    expect(screen.queryByTestId('meta')).toBeNull()
+  })
 })

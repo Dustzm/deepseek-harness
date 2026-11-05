@@ -1,6 +1,7 @@
 /**
  * Goal surface plugin, browser half: the GoalBar entry in the
- * conversation.input.dock strip. The durable goal arrives through
+ * conversation.input.dock strip, which declares the `goal.bar.meta` child
+ * slot for readouts other plugins place before its actions. The durable goal arrives through
  * `useProjection('goal')`. A registrant-private activation hook source owns
  * the live Remote read and event subscription; the inject face carries that
  * hook plus the four mutation verbs through the generated Goal Remote API.
@@ -26,7 +27,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: pulls the Session standard useProjection seat.
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 // Type-only: the `goal` SessionProjectionMap key merge (single source, the domain's pure outlet).
-import type { GoalProjection, GoalRef } from '@deepseek-ai/dsh-goal/client'
+import type { GoalActivation, GoalProjection, GoalRef, GoalSnapshot } from '@deepseek-ai/dsh-goal/client'
 import type { GoalActionResult, GoalBarInjected } from './slots.ts'
 import { createGoalActivationSource } from './activation-source.ts'
 import { GoalDock } from './GoalBar.tsx'
@@ -54,6 +55,24 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** The goal strip's copy. */
     goal: GoalKey
+  }
+  interface SlotMap {
+    /**
+     * Compact readouts (such as elapsed time) in the goal strip, placed just
+     * before its icon actions. Rendered only while the strip shows a present,
+     * non-complete goal and not while it edits; entries are direct flex items
+     * of the 36px strip, so each one sizes and styles itself.
+     */
+    'goal.bar.meta': {
+      kind: 'list'
+      scope: 'session'
+      owner: {
+        /** Durable goal snapshot the strip is showing. */
+        readonly goal: GoalSnapshot
+        /** Process-local continuation activation; absent while the live read is pending. */
+        readonly activation?: GoalActivation
+      }
+    }
   }
 }
 
@@ -104,6 +123,7 @@ export function apply(ctx: ClientContext): void {
     id: 'goal',
     order: 10,
     locale: NS,
+    children: { 'goal.bar.meta': { kind: 'list', scope: 'session' } },
     inject: (sessionId): GoalBarInjected => {
       const binding = sessions.binding(sessionId)
       if (binding === undefined) throw new Error(`ui-goal: session "${sessionId}" is unavailable`)

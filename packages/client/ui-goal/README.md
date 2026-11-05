@@ -27,6 +27,16 @@ The Web GUI goal surface shows both the durable goal state and its current proce
 
 Mount this plugin alongside `ui-conversation` and the goal domain package; the strip then appears as the second card in the composer-context stack (after Todo, before Queue) whenever the session has a goal. Todo and Goal use the same panel elevation above the composer. An armed active goal offers pause; an active-but-disarmed or paused goal offers resume; edit rewrites the objective in the ui-primitives `InlineEditor`, so multi-line objectives survive editing; clear removes the goal and suppresses the strip until the projection catches up.
 
+### Strip readouts
+
+The dock entry declares the `goal.bar.meta` list slot, so other plugins can place compact readouts such as elapsed time between the objective and the icon actions. Each entry receives the strip's `goal` snapshot and, once known, its `activation`. The slot renders only while the strip shows a present, non-complete goal, and not while it edits. Entries are direct flex items of the 36px strip, so each one sizes and styles itself; an empty slot leaves the strip unchanged.
+
+```ts
+ctx.slots.inject('goal.bar.meta', () => ctx.slots.register({
+  name: 'goal.bar.meta', id: 'elapsed',
+}, GoalElapsed))
+```
+
 ### The command-input bubble
 
 Each durable `/goal` run projects as a right-aligned user-style bubble labeled `Command input` (or `指令输入`), rendered before the generic command result row; the leading `/goal` token renders as a command reference chip in the code face through the shared `conversation.user.text` Factory and the Goal-owned `command` renderer, using the executed token range in `facts.commands`, and the objective stays plain body text. It carries no timestamp, copy, or branch actions, and reloading reconstructs it from the run.
