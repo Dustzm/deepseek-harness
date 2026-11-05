@@ -1,8 +1,10 @@
 import { tmpdir } from 'node:os'
-import { readFileSync } from 'node:fs'
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { Arch, Platform } from 'electron-builder'
 import { Packager } from 'app-builder-lib'
 import { describe, expect, it, vi } from 'vitest'
+import { writeDistributionFixture } from './fixtures/desktop-distribution.ts'
 
 const { execute } = vi.hoisted(() => ({ execute: vi.fn(async () => undefined) }))
 vi.mock('node:child_process', async (importOriginal) => {
@@ -75,6 +77,33 @@ describe('installer preparation preserves application dependencies', () => {
       DSH_DESKTOP_UNSIGNED: '1',
     }, 'win32', 'x64')
     expect(config.artifactName).toBe('deepseek-harness-${version}-${os}-${arch}-unsigned.${ext}')
+  })
+
+  it('packages an unsigned Windows distribution with its own tray icon and installer artwork and no policy', async () => {
+    const root = writeDistributionFixture({
+      icons: { macos: 'icons/icon.icns', windows: 'icons/icon.png', windowsTray: 'icons/tray.ico' },
+      windowsInstaller: 'icons',
+    })
+    try {
+      writeFileSync(join(root, 'icons/tray.ico'), '')
+      const { WINDOWS_INSTALLER_IMAGES } = await import('../scripts/desktop-distribution.mjs')
+      for (const image of WINDOWS_INSTALLER_IMAGES) writeFileSync(join(root, 'icons', image), '')
+      const { createElectronBuilderConfig } = await import('../scripts/electron-builder-config.mjs')
+      const config = createElectronBuilderConfig({
+        DSH_DESKTOP_APP_ID: 'com.example.installer',
+        DSH_DESKTOP_DISTRIBUTION: root,
+        DSH_DESKTOP_TARGET_PLATFORM: 'win32',
+        DSH_DESKTOP_TARGET_ARCH: 'x64',
+        DSH_DESKTOP_UNSIGNED: '1',
+      }, 'win32', 'x64')
+      expect(config.extraMetadata).not.toHaveProperty('dshMandatoryUpdatePolicy')
+      expect(config.extraResources.find(resource => resource.to === 'tray.ico')?.from).toBe(join(root, 'icons/tray.ico'))
+      execute.mockClear()
+      await config.beforeBuild()
+      expect(execute).toHaveBeenCalledWith('powershell.exe', expect.arrayContaining(['-AssetsDirectory', join(root, 'icons')]), expect.anything())
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 
   it('packages every preload entry point the shell loads', async () => {

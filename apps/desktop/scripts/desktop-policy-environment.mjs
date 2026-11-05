@@ -11,6 +11,16 @@ function origin(value, name) {
 }
 
 /**
+ * Decide whether a build carries the mandatory-update policy. Unsigned macOS builds omit it, and so does every
+ * distribution: the policy service belongs to the DeepSeek Harness release configuration, which a distribution never uses.
+ * @param {{ platform: 'win32' | 'darwin', unsigned: boolean, distribution: boolean }} build Target platform, signing mode, and whether a distribution is packaged.
+ * @returns {boolean} True when packaging must resolve and embed the policy.
+ */
+export function desktopPolicyRequired({ platform, unsigned, distribution }) {
+  return !distribution && !(platform === 'darwin' && unsigned)
+}
+
+/**
  * Resolve mandatory policy metadata before preparing artifacts or accessing signing hardware.
  * @param {NodeJS.ProcessEnv} environment File-owned release settings; the unselected origin is not required.
  * @returns {{ origin: string, allowedPageOrigins: string[], authentication: 'anonymous' | 'feishu-test', [key: string]: unknown }} Selected policy.

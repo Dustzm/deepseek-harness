@@ -2,7 +2,7 @@
  * Load the optional distribution that repackages Desktop under another product.
  *
  * A distribution directory holds `distribution.json` and the files it names:
- * product identity, icons, the client identity embedded in Web artifacts,
+ * product identity, icons, Windows installer artwork, the client identity embedded in Web artifacts,
  * additional package tarballs, and the profile bundles a new installation
  * starts with. Packaging without a distribution produces DeepSeek Harness.
  */
@@ -18,6 +18,9 @@ export const DESKTOP_DISTRIBUTION_ENV = 'DSH_DESKTOP_DISTRIBUTION'
 export const DESKTOP_DISTRIBUTION_MANIFEST_FIELD = 'dshDesktopDistribution'
 
 const DISTRIBUTION_FILE = 'distribution.json'
+
+/** Artwork a `windowsInstaller` directory supplies, named and sized as the shipped `installer/assets` files. */
+export const WINDOWS_INSTALLER_IMAGES = ['brand.png', 'brand-2x.png', 'brand-dark.png', 'brand-dark-2x.png', 'uninstaller-sidebar.png']
 
 /** Client build values a distribution may set; file-valued ones resolve against the distribution directory. */
 const CLIENT_IDENTITY_FIELDS = {
@@ -135,6 +138,15 @@ export function readDesktopDistribution(directory) {
     throw new Error('desktop distribution: asarUnpack must list relative glob patterns')
   }
   /** @type {string | undefined} */
+  let windowsInstaller
+  if (value.windowsInstaller !== undefined) {
+    if (typeof value.windowsInstaller !== 'string' || value.windowsInstaller === '' || isAbsolute(value.windowsInstaller)) {
+      throw new Error('desktop distribution: windowsInstaller must be a directory relative to the distribution directory')
+    }
+    windowsInstaller = resolve(root, value.windowsInstaller)
+    for (const image of WINDOWS_INSTALLER_IMAGES) requireFile(root, `${value.windowsInstaller}/${image}`, 'windowsInstaller image')
+  }
+  /** @type {string | undefined} */
   let welcome
   if (value.welcome !== undefined) {
     if (typeof value.welcome !== 'string' || value.welcome === '' || isAbsolute(value.welcome)) {
@@ -158,12 +170,14 @@ export function readDesktopDistribution(directory) {
       macos: requireFile(root, icons.macos, 'icons.macos'),
       windows: requireFile(root, icons.windows, 'icons.windows'),
       ...(icons.dmgBackground === undefined ? {} : { dmgBackground: requireFile(root, icons.dmgBackground, 'icons.dmgBackground') }),
+      ...(icons.windowsTray === undefined ? {} : { windowsTray: requireFile(root, icons.windowsTray, 'icons.windowsTray') }),
     },
     client: clientIdentity,
     packages,
     profile: { bundles: [...profile.bundles] },
     signIn: value.signIn,
     asarUnpack: [...asarUnpack],
+    ...windowsInstaller === undefined ? {} : { windowsInstaller },
     ...welcome === undefined ? {} : { welcome },
   }
 }
