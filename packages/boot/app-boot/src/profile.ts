@@ -460,7 +460,7 @@ export async function createRuntimeResolution(
   const localPackageNames = profile === undefined ? [] : installedProfilePackageNames(profile, manifest)
   const profilePackages: ReadonlyMap<string, string> = profile === undefined
     ? new Map<string, string>()
-    : collectProfileScopePackages(profile, packageNames, profileDeclarers, profileVersions)
+    : collectProfileScopePackages(profile, packageNames, installAnchor, profileDeclarers, profileVersions)
   const linkedRoots = profile === undefined ? [] : linkedProfileRoots(profile, profilesDir)
   // The Promise return type is the pre-stable API; construction has no asynchronous step.
   return await Promise.resolve(new ProfileRuntimeResolution({ installAnchor, profileDir: profile?.dir, home }, {
@@ -590,7 +590,7 @@ function dependencyClosure(
 
 /** Collect packages carried by the profile's selected bundles that the installation does not supply. */
 function collectProfileScopePackages(
-  profile: Profile, installationPackageNames: ReadonlySet<string>,
+  profile: Profile, installationPackageNames: ReadonlySet<string>, installAnchor: string,
   declarers?: Map<string, string>,
   versions?: Map<string, string | undefined>,
 ): Map<string, string> {
@@ -601,12 +601,14 @@ function collectProfileScopePackages(
   for (const layer of profile.layers) bundleLinks.delete(layer.packageName)
   // A bundle may configure a plugin from its own package (`<bundle>/<subpath>`). A bundle installed in the profile
   // resolves natively from the profile directory; a bundle found beside the installation, which the installation
-  // does not depend on, would have no entry, so it maps to the directory the layer was resolved from.
+  // does not depend on, would have no entry, so it maps to the directory the layer was resolved from. The route
+  // resolves from the declarer, so the declarer is the installation anchor the layer was found from.
+  const anchor = join(realModuleDirectory(dirname(installAnchor)), basename(installAnchor))
   for (const layer of profile.layers) {
     const local = relative(profile.dir, layer.packageDir)
     if (installationPackageNames.has(layer.packageName) || (!local.startsWith('..') && !isAbsolute(local))) continue
     bundleLinks.set(layer.packageName, layer.packageDir)
-    declarers?.set(layer.packageName, join(profile.dir, 'package.json'))
+    declarers?.set(layer.packageName, anchor)
     versions?.set(layer.packageName, readPackageManifest(join(realModuleDirectory(layer.packageDir), 'package.json')).version)
   }
   return bundleLinks

@@ -37,7 +37,7 @@
 | 桌面发行配置 `asarUnpack`：发行方追加放到 `app.asar` 之外的 glob 模式 | 通用扩展接口 | `apps/desktop`（`scripts/desktop-distribution.mjs`、`.d.mts`、`electron-builder-config.mjs`、测试、`packaging/README` 中英） | 随包插件要 spawn 的可执行文件（如视频理解的 ffmpeg）在归档里无法运行，内置解包列表只认 DSH 自己的包 | 上游提供同类配置后可去掉 |
 | 启动时按随包模板调和 profile 的 bundle 列表 `syncTemplateBundles`（记录在 `.dsh-template-bundles.json`） | 内核急修 | `packages/boot/app-boot`（`src/profile-template-sync.ts`、导出、测试、README 中英）；`apps/desktop/src/project-manager.ts`、README 中英 | profile 只在首次创建时写入 bundle 列表，桌面端升级后新增的内置 bundle（如记忆、多模态）到不了老用户 | 上游修复同类问题后可去掉 |
 | 桌面端加载页的标志与深色 favicon 从安装包静态目录提供（`isPackagedWebPath`） | 内核急修 | `apps/desktop/src/web-document.ts`、`main.ts`、测试 | 构建期产品标识写出的 `boot-mark*.svg`、`favicon-dark.svg` 原先转给 Host，加载期间 Host 未就绪返回 503，加载动效显示成裂图 | 上游修复后可去掉 |
-| runtime resolution 为安装目录旁找到的 bundle 建立自身包名条目 | 内核急修 | `packages/boot/app-boot`（`src/profile.ts` 的 `collectProfileScopePackages`、测试、README 中英） | 桌面发行版把社区 bundle（dsh-mnemon）放在安装目录里，它的 patch 行引用本包插件 `dsh-mnemon/bundle`，原先没有条目、导入失败，记忆服务起不来 | 上游修复同类问题后可去掉 |
+| runtime resolution 为安装目录旁找到的 bundle 建立自身包名条目（声明者为安装锚点，解析从那里出发） | 内核急修 | `packages/boot/app-boot`（`src/profile.ts` 的 `collectProfileScopePackages`、测试、README 中英） | 桌面发行版把社区 bundle（dsh-mnemon）放在安装目录里，它的 patch 行引用本包插件 `dsh-mnemon/bundle`，原先没有条目、导入失败，记忆服务起不来 | 上游修复同类问题后可去掉 |
 
 ## 核心仓库如何使用这些改动
 
