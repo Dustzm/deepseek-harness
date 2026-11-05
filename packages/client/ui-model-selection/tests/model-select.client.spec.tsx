@@ -150,6 +150,10 @@ describe('ModelSelect label slot', () => {
   })
 })
 
+function isMenuRowOwner(owner: unknown): owner is ModelMenuRowOwner {
+  return typeof owner === 'object' && owner !== null && 'classNames' in owner
+}
+
 describe('ModelSelect menu extension rows', () => {
   it('renders extension rows below the root cells with the native row styling and walks them with the keyboard', () => {
     const directory = createSnapshotStore<ModelDirectoryState>(state())
@@ -158,7 +162,8 @@ describe('ModelSelect menu extension rows', () => {
     const renderSlot: ComponentProps<typeof ModelSelect>['renderSlot'] = (name, owner, options) => {
       if (name !== 'conversation.input.model.menu.row') return options?.fallback ?? null
       owners.push(owner)
-      const { classNames } = owner as ModelMenuRowOwner
+      if (!isMenuRowOwner(owner)) throw new Error('expected a model menu row owner')
+      const { classNames } = owner
       return (
         <button type="button" role="menuitemcheckbox" aria-checked={false} className={classNames.row} onClick={toggle}>
           <span className={classNames.label}>Extra</span>
