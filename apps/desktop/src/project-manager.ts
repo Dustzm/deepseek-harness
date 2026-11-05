@@ -23,7 +23,7 @@ import type { DesktopPaths } from './paths.ts'
 import type { DesktopRelease } from './release.ts'
 import { readDesktopRuntime } from './runtime-tree.ts'
 import {
-  initProfile, PROFILE_TEMPLATES, removeLinkProjections, sanitizeProfile, type ProfileTemplate,
+  initProfile, PROFILE_TEMPLATES, removeLinkProjections, sanitizeProfile, syncTemplateBundles, type ProfileTemplate,
 } from '@deepseek-ai/dsh-app-boot'
 
 const PROJECT_NAME = '@deepseek-ai/dsh-desktop-runtime'
@@ -88,6 +88,7 @@ export class DesktopProjectManager {
       readDesktopRuntime(this.runtime.dsh)
       migrateProfileSettings(this.paths.profile)
       createPluginProfile(this.paths.profile, this.bundles)
+      syncTemplateBundles('dsh', this.paths.profile, this.bundles)
       removeLinkProjections(this.paths.profile)
     })
   }

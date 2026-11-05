@@ -35,6 +35,7 @@
 | 会话表层批量投影 `ctx.sessionQuery.projectSurfaces(ids, project, signal)`；`readSurface(id, signal)` 接收取消信号 | 通用扩展接口 | `packages/session-query/session-query`（`src/index.ts`、`src/types.ts` 的 `SessionSurfaceSource` 与 `SessionSurfaceProjectionResult`、`src/tracing.ts` 的 `currentSurfaceEventRefs`、测试 `tests/session-query.spec.ts`、中英 README）、`docs/subsystems/session-query` 中英、`scripts/type-equiv.manifest.json`、`scripts/gen-cordis-catalog.ts`、重新生成的 `packages/extensions/tool-cordis/src/api-catalog.ts` | 读多个会话正文只能逐个调 `readSurface`，每次都要列一遍持久化并整份克隆日志，几百个会话时总操作量按平方增长（通办全局搜索的正文语料就是这样读的）；新方法复用 `readTitleSnapshots` 的批量投影，整批只列一次，借用事件交给调用方的同步投影函数，不复制日志；`readSurface` 原来不能取消 | 上游提供等价的批量表层读取后可去掉 |
 | 目标条带的读数扩展位 `goal.bar.meta` | 通用扩展接口 | `packages/client/ui-goal`（`src/client/index.ts`、`GoalBar.tsx`、测试、中英 README） | 输入框上方的目标条带是写死的组件，下游无法在操作按钮旁加耗时之类的读数；新增 list 扩展位，条目收到目标快照与激活状态，空列表时条带不变 | 上游提供等价扩展位后可去掉 |
 | 桌面发行配置 `asarUnpack`：发行方追加放到 `app.asar` 之外的 glob 模式 | 通用扩展接口 | `apps/desktop`（`scripts/desktop-distribution.mjs`、`.d.mts`、`electron-builder-config.mjs`、测试、`packaging/README` 中英） | 随包插件要 spawn 的可执行文件（如视频理解的 ffmpeg）在归档里无法运行，内置解包列表只认 DSH 自己的包 | 上游提供同类配置后可去掉 |
+| 启动时按随包模板调和 profile 的 bundle 列表 `syncTemplateBundles`（记录在 `.dsh-template-bundles.json`） | 内核急修 | `packages/boot/app-boot`（`src/profile-template-sync.ts`、导出、测试、README 中英）；`apps/desktop/src/project-manager.ts`、README 中英 | profile 只在首次创建时写入 bundle 列表，桌面端升级后新增的内置 bundle（如记忆、多模态）到不了老用户 | 上游修复同类问题后可去掉 |
 
 ## 核心仓库如何使用这些改动
 
