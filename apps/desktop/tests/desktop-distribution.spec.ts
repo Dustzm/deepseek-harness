@@ -1,36 +1,23 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   desktopDistributionMetadata,
   readDesktopDistribution,
   resolveDesktopDistribution,
+  WINDOWS_INSTALLER_IMAGES,
 } from '../scripts/desktop-distribution.mjs'
 import { desktopDistribution } from '../src/distribution.ts'
 import { resolveDesktopLocale, resolveDesktopStartupLocale } from '../src/locale.ts'
+import { writeDistributionFixture } from './fixtures/desktop-distribution.ts'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
 
 /** Write a valid distribution directory, with `patch` merged over the top-level fields. */
 function fixture(patch: Record<string, unknown> = {}): string {
-  const root = mkdtempSync(join(tmpdir(), 'desktop-distribution-'))
+  const root = writeDistributionFixture(patch)
   roots.push(root)
-  mkdirSync(join(root, 'icons'))
-  mkdirSync(join(root, 'client'))
-  mkdirSync(join(root, 'packages'))
-  for (const file of ['icons/icon.icns', 'icons/icon.png', 'client/mark.svg', 'packages/product-bundle-0.1.0.tgz']) writeFileSync(join(root, file), '')
-  writeFileSync(join(root, 'distribution.json'), JSON.stringify({
-    schemaVersion: 1,
-    product: { name: 'Product', fileName: 'product', appId: 'com.example.product', version: '0.1.0', protocol: 'product', homeDirName: '.product' },
-    icons: { macos: 'icons/icon.icns', windows: 'icons/icon.png' },
-    client: { DSH_CLIENT_TITLE: 'Product', DSH_CLIENT_ICON: 'client/mark.svg', DSH_CLIENT_BOOT_HINT: '' },
-    packages: 'packages',
-    profile: { bundles: ['@deepseek-ai/dsh-base', '@product/bundle'] },
-    signIn: false,
-    ...patch,
-  }))
   return root
 }
 
@@ -84,6 +71,21 @@ describe('desktop distribution', () => {
     const distribution = readDesktopDistribution(root)
     expect(distribution.welcome).toBe(join(root, 'welcome'))
     expect(desktopDistributionMetadata(distribution).welcome).toBe(true)
+  })
+
+  it('replaces the Windows tray icon and installer artwork only with files that exist', () => {
+    const root = fixture({ icons: { macos: 'icons/icon.icns', windows: 'icons/icon.png', windowsTray: 'icons/tray.ico' }, windowsInstaller: 'installer' })
+    mkdirSync(join(root, 'installer'))
+    for (const image of WINDOWS_INSTALLER_IMAGES.slice(1)) writeFileSync(join(root, 'installer', image), '')
+    expect(() => readDesktopDistribution(root)).toThrow(/windowsInstaller image installer\/brand\.png/)
+    writeFileSync(join(root, 'installer', WINDOWS_INSTALLER_IMAGES[0]), '')
+    expect(() => readDesktopDistribution(root)).toThrow(/icons\.windowsTray/)
+    writeFileSync(join(root, 'icons/tray.ico'), '')
+    const distribution = readDesktopDistribution(root)
+    expect(distribution.icons.windowsTray).toBe(join(root, 'icons/tray.ico'))
+    expect(distribution.windowsInstaller).toBe(join(root, 'installer'))
+    expect(readDesktopDistribution(fixture())).not.toHaveProperty('windowsInstaller')
+    expect(() => readDesktopDistribution(fixture({ windowsInstaller: '/abs/installer' }))).toThrow(/windowsInstaller must be a directory/)
   })
 
   it('rejects a relative directory and a packaged manifest with invalid facts', () => {

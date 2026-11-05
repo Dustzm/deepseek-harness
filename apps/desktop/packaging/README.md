@@ -173,18 +173,20 @@ Unsigned packaging commands accept `--distribution <absolute directory>` (or the
 | Field | Effect |
 |---|---|
 | `product` | Name, artifact file name, application ID, product version, deep-link scheme, and default data directory name (`~/<homeDirName>` when `DSH_HOME` is unset) |
-| `icons` | macOS and Windows application icons, with an optional DMG background |
+| `icons` | macOS and Windows application icons, with an optional DMG background and an optional Windows tray icon `windowsTray` (ICO, replacing the shipped tray icon) |
 | `client` | `DSH_CLIENT_*` product identity embedded in the Web client build; `DSH_CLIENT_TITLE` is required |
 | `packages` | Directory of additional package tarballs; every package in it becomes a root of the bundled package set |
 | `profile.bundles` | Bundles a new Desktop profile starts with, which native recovery also keeps |
 | `signIn` | Whether Welcome offers DeepSeek account sign-in; with `false` it offers only the API key and the main process does not connect to the account service |
 | `asarUnpack` | Optional list of extra glob patterns kept outside `app.asar` in `app.asar.unpacked`, added to the built-in list; use it for executables a bundled package spawns, which cannot run from inside the archive |
+| `windowsInstaller` | Optional Windows installer artwork directory holding `brand.png`, `brand-2x.png`, `brand-dark.png`, `brand-dark-2x.png`, and `uninstaller-sidebar.png` with the names and sizes of `installer/assets`; it replaces the installation page artwork and the uninstaller sidebar. Installer copy names the product from `product.name` |
 | `welcome` | Optional welcome page directory whose `index.html` replaces the shipped Welcome page; the page uses `window.dshWelcome` (locale, `signIn`, `saveApiKey`, `skip`, and the rest) through the same isolated preload, under its own CSP |
 
-Loading validates every field and fails the package run on a missing or invalid one. A distribution build uses the `distribution` client build profile: the official values plus the `client` identity, with `DSH_CLIENT_BUILD_PROFILE` set to `distribution`; release packing verifies the build record against the same values. The application reports the product version while the bundled dsh runtime keeps the repository version. Only unsigned builds are supported, and their artifacts carry no automatic or mandatory update configuration.
+Loading validates every field and fails the package run on a missing or invalid one. A distribution build uses the `distribution` client build profile: the official values plus the `client` identity, with `DSH_CLIENT_BUILD_PROFILE` set to `distribution`; release packing verifies the build record against the same values. The application reports the product version while the bundled dsh runtime keeps the repository version. Only unsigned builds are supported, and their artifacts carry no automatic or mandatory update configuration, so distribution packaging reads neither `.env.macos` nor `.env.windows`.
 
 ```sh
 pnpm --dir apps/desktop run package:mac:arm64:unsigned --distribution /abs/path/to/distribution
+pnpm --dir apps/desktop run package:win:x64:unsigned --distribution C:\abs\path\to\distribution
 ```
 
 <a id="macos-release-signing"></a>

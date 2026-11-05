@@ -1,7 +1,9 @@
 import { expect, it } from 'vitest'
-import { resolveDesktopPolicyEnvironment } from '../scripts/desktop-policy-environment.mjs'
+import { rmSync } from 'node:fs'
+import { desktopPolicyRequired, resolveDesktopPolicyEnvironment } from '../scripts/desktop-policy-environment.mjs'
 import { validateDesktopPackageEnvironment } from '../scripts/desktop-package-environment.mjs'
 import { resolveDesktopPolicyConfig } from '../src/mandatory-update-policy.ts'
+import { writeDistributionFixture } from './fixtures/desktop-distribution.ts'
 
 const origins = { DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN: 'https://test.example.com',
   DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN: 'https://prod.example.com' }
@@ -56,5 +58,21 @@ it.each([{ unsigned: true }, { prepareOnly: true }, {}])('requires policy outsid
     }
     expect(() => { validateDesktopPackageEnvironment({ DSH_DESKTOP_APP_ID: 'com.example.test' }, { platform, arch: 'x64' }, options) })
       .toThrow('DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN')
+  }
+})
+
+it('omits the policy from unsigned macOS builds and from every distribution', () => {
+  expect(desktopPolicyRequired({ platform: 'darwin', unsigned: true, distribution: false })).toBe(false)
+  expect(desktopPolicyRequired({ platform: 'darwin', unsigned: false, distribution: false })).toBe(true)
+  expect(desktopPolicyRequired({ platform: 'win32', unsigned: true, distribution: false })).toBe(true)
+  for (const platform of ['win32', 'darwin'] as const) {
+    expect(desktopPolicyRequired({ platform, unsigned: true, distribution: true })).toBe(false)
+  }
+  const distribution = writeDistributionFixture()
+  try {
+    expect(() => { validateDesktopPackageEnvironment({ DSH_DESKTOP_APP_ID: 'com.example.test', DSH_DESKTOP_DISTRIBUTION: distribution },
+      { platform: 'win32', arch: 'x64' }, { unsigned: true }) }).not.toThrow()
+  } finally {
+    rmSync(distribution, { recursive: true, force: true })
   }
 })

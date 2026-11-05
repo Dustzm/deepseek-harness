@@ -20,7 +20,8 @@ export interface DesktopDistributionProduct {
 export interface DesktopDistribution {
   readonly root: string
   readonly product: DesktopDistributionProduct
-  readonly icons: { readonly macos: string; readonly windows: string; readonly dmgBackground?: string }
+  /** Application icons; `windowsTray` is the Windows notification-area ICO, replacing the shipped tray icon. */
+  readonly icons: { readonly macos: string; readonly windows: string; readonly dmgBackground?: string; readonly windowsTray?: string }
   /** `DSH_CLIENT_*` values embedded in the Web client build. */
   readonly client: Readonly<Record<string, string>>
   /** Directory of package tarballs added as roots of the bundled package set. */
@@ -30,9 +31,14 @@ export interface DesktopDistribution {
   readonly signIn: boolean
   /** Extra glob patterns kept outside `app.asar`, such as executables a bundled package spawns; empty when omitted. */
   readonly asarUnpack: readonly string[]
+  /** Directory holding every `WINDOWS_INSTALLER_IMAGES` file, replacing the shipped installer page and uninstaller sidebar artwork. */
+  readonly windowsInstaller?: string
   /** Directory whose `index.html` replaces the shipped welcome page, using the same `window.dshWelcome` API. */
   readonly welcome?: string
 }
+
+/** Artwork a `windowsInstaller` directory supplies, named and sized as the shipped `installer/assets` files. */
+export const WINDOWS_INSTALLER_IMAGES: readonly ['brand.png', 'brand-2x.png', 'brand-dark.png', 'brand-dark-2x.png', 'uninstaller-sidebar.png']
 
 /** Environment variable naming the distribution directory for one packaging run. */
 export const DESKTOP_DISTRIBUTION_ENV: 'DSH_DESKTOP_DISTRIBUTION'
