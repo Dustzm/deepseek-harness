@@ -65,8 +65,15 @@ describe('desktop distribution', () => {
     [{ client: { DSH_CLIENT_ICON: 'client/mark.svg' } }, /DSH_CLIENT_TITLE is required/],
     [{ profile: { bundles: [] } }, /profile\.bundles/],
     [{ signIn: 'no' }, /signIn/],
+    [{ asarUnpack: ['/abs/**'] }, /asarUnpack/],
+    [{ asarUnpack: 'vendor/**' }, /asarUnpack/],
   ])('rejects an invalid distribution %#', (patch, message) => {
     expect(() => readDesktopDistribution(fixture(patch))).toThrow(message)
+  })
+
+  it('keeps the extra asarUnpack patterns, defaulting to none', () => {
+    expect(readDesktopDistribution(fixture()).asarUnpack).toEqual([])
+    expect(readDesktopDistribution(fixture({ asarUnpack: ['**/vendor/tool/**/*'] })).asarUnpack).toEqual(['**/vendor/tool/**/*'])
   })
 
   it('ships a distribution welcome page only when its index.html exists', () => {
