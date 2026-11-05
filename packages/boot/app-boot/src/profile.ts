@@ -23,7 +23,7 @@
 
 import { createRequire } from 'node:module'
 import { existsSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
-import { basename, dirname, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type { EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 import { applyEntryPatches, type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
@@ -599,6 +599,16 @@ function collectProfileScopePackages(
     .map(layer => join(layer.packageDir, 'package.json'))
   const bundleLinks = dependencyClosure(bundleAnchors, installationPackageNames, declarers, versions)
   for (const layer of profile.layers) bundleLinks.delete(layer.packageName)
+  // A bundle may configure a plugin from its own package (`<bundle>/<subpath>`). A bundle installed in the profile
+  // resolves natively from the profile directory; a bundle found beside the installation, which the installation
+  // does not depend on, would have no entry, so it maps to the directory the layer was resolved from.
+  for (const layer of profile.layers) {
+    const local = relative(profile.dir, layer.packageDir)
+    if (installationPackageNames.has(layer.packageName) || (!local.startsWith('..') && !isAbsolute(local))) continue
+    bundleLinks.set(layer.packageName, layer.packageDir)
+    declarers?.set(layer.packageName, join(profile.dir, 'package.json'))
+    versions?.set(layer.packageName, readPackageManifest(join(realModuleDirectory(layer.packageDir), 'package.json')).version)
+  }
   return bundleLinks
 }
 

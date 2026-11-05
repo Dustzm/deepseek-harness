@@ -306,6 +306,23 @@ describe('runtime resolution', { concurrent: false }, () => {
     })
   })
 
+  it('maps a bundle found beside the installation so its own plugin subpaths resolve', async () => {
+    const f = fixture()
+    const shipped = join(dirname(f.installAnchor), 'node_modules', 'shipped-bundle')
+    pkg(shipped, 'shipped-bundle', 4)
+    const installedInProfile = join(f.profile.dir, 'node_modules', 'profile-bundle')
+    pkg(installedInProfile, 'profile-bundle', 5)
+    for (const [packageName, packageDir] of [['shipped-bundle', shipped], ['profile-bundle', installedInProfile]] as const) {
+      f.profile.layers.push({ packageName, packageDir, patchPaths: [join(packageDir, 'cordis.patch.yml')], patches: [] })
+    }
+
+    const resolution = await resolutionOf(f)
+    expect(resolution.entries.find(entry => entry.name === 'shipped-bundle')).toMatchObject({
+      packageDir: shipped, scope: 'profile', version: '4.0.0', declarer: join(f.profile.dir, 'package.json'),
+    })
+    expect(resolution.entries.find(entry => entry.name === 'profile-bundle')).toBeUndefined()
+  })
+
   it('keeps each earlier root complete before considering a later root', async () => {
     const f = fixture('installation-bridge')
     const installedBridge = f.installed
