@@ -9,6 +9,19 @@ const MIME: Readonly<Record<string, string>> = {
 }
 const BOOT = '<script>globalThis.__DSH_BOOT_READY__ = Promise.withResolvers()</script>'
 
+/** Top-level files of the packaged Web dist that the boot page and document head load before the Host is reachable. */
+const PACKAGED_ROOT_FILES = new Set(['/favicon.svg', '/favicon-dark.svg', '/boot-mark.svg', '/boot-mark-dark.svg', '/manifest.webmanifest'])
+
+/**
+ * Whether an application path is served from the packaged Web dist instead of the Host.
+ * The boot page shows its marks while the Host is still starting, so every file it references must be local.
+ * @param pathname - URL path of a `dsh-app://app` request.
+ * @returns True for the index, hashed assets, and the identity files the initial HTML references.
+ */
+export function isPackagedWebPath(pathname: string): boolean {
+  return pathname === '/' || pathname === '/index.html' || pathname.startsWith('/assets/') || PACKAGED_ROOT_FILES.has(pathname)
+}
+
 /**
  * Read an application-owned static asset; the index waits for asynchronous Host injections.
  * @param request - Local application request.
