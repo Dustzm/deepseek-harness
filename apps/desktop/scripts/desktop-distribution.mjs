@@ -130,6 +130,10 @@ export function readDesktopDistribution(directory) {
     throw new Error('desktop distribution: profile.bundles must list distinct package names')
   }
   if (typeof value.signIn !== 'boolean') throw new Error('desktop distribution: signIn must be true or false')
+  const asarUnpack = value.asarUnpack ?? []
+  if (!Array.isArray(asarUnpack) || !asarUnpack.every(pattern => typeof pattern === 'string' && pattern !== '' && !isAbsolute(pattern))) {
+    throw new Error('desktop distribution: asarUnpack must list relative glob patterns')
+  }
   /** @type {string | undefined} */
   let welcome
   if (value.welcome !== undefined) {
@@ -159,6 +163,7 @@ export function readDesktopDistribution(directory) {
     packages,
     profile: { bundles: [...profile.bundles] },
     signIn: value.signIn,
+    asarUnpack: [...asarUnpack],
     ...welcome === undefined ? {} : { welcome },
   }
 }

@@ -178,6 +178,7 @@ Unsigned packaging commands accept `--distribution <absolute directory>` (or the
 | `packages` | Directory of additional package tarballs; every package in it becomes a root of the bundled package set |
 | `profile.bundles` | Bundles a new Desktop profile starts with, which native recovery also keeps |
 | `signIn` | Whether Welcome offers DeepSeek account sign-in; with `false` it offers only the API key and the main process does not connect to the account service |
+| `asarUnpack` | Optional list of extra glob patterns kept outside `app.asar` in `app.asar.unpacked`, added to the built-in list; use it for executables a bundled package spawns, which cannot run from inside the archive |
 | `welcome` | Optional welcome page directory whose `index.html` replaces the shipped Welcome page; the page uses `window.dshWelcome` (locale, `signIn`, `saveApiKey`, `skip`, and the rest) through the same isolated preload, under its own CSP |
 
 Loading validates every field and fails the package run on a missing or invalid one. A distribution build uses the `distribution` client build profile: the official values plus the `client` identity, with `DSH_CLIENT_BUILD_PROFILE` set to `distribution`; release packing verifies the build record against the same values. The application reports the product version while the bundled dsh runtime keeps the repository version. Only unsigned builds are supported, and their artifacts carry no automatic or mandatory update configuration.

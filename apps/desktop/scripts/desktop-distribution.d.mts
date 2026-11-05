@@ -28,6 +28,8 @@ export interface DesktopDistribution {
   readonly profile: { readonly bundles: readonly string[] }
   /** Whether the welcome flow offers DeepSeek account sign-in. */
   readonly signIn: boolean
+  /** Extra glob patterns kept outside `app.asar`, such as executables a bundled package spawns; empty when omitted. */
+  readonly asarUnpack: readonly string[]
   /** Directory whose `index.html` replaces the shipped welcome page, using the same `window.dshWelcome` API. */
   readonly welcome?: string
 }

@@ -178,6 +178,7 @@ pnpm run package:desktop:mac:x64:unsigned
 | `packages` | 额外的包 tarball 目录；其中每个包都作为包集合的根随应用打包 |
 | `profile.bundles` | 新 Desktop profile 的 bundle 列表，同时是原生恢复保留的列表 |
 | `signIn` | 欢迎页是否提供 DeepSeek 账号登录；为 `false` 时只提供 API Key，主进程也不连接账号服务 |
+| `asarUnpack` | 可选，额外放到 `app.asar` 之外（`app.asar.unpacked`）的 glob 模式，追加在内置列表之后；用于随包插件要 spawn 的可执行文件，它们在归档里无法运行 |
 | `welcome` | 可选的欢迎页目录，其中的 `index.html` 替换自带欢迎页；页面经同一个隔离 preload 使用 `window.dshWelcome`（语言、`signIn`、`saveApiKey`、`skip` 等），受页面自身的 CSP 约束 |
 
 加载时校验每个字段，缺失或无效时打包立即失败。发行配置打包以 `distribution` 客户端构建档构建仓库：官方构建值加上 `client` 中的产品标识，`DSH_CLIENT_BUILD_PROFILE` 为 `distribution`，release 打包按同一组值校验构建记录。应用显示产品版本，内置 dsh 运行时保留仓库版本。目前只支持未签名构建，产物不含自动更新与强制更新配置。
