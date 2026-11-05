@@ -318,9 +318,11 @@ describe('runtime resolution', { concurrent: false }, () => {
 
     const resolution = await resolutionOf(f)
     expect(resolution.entries.find(entry => entry.name === 'shipped-bundle')).toMatchObject({
-      packageDir: shipped, scope: 'profile', version: '4.0.0', declarer: join(f.profile.dir, 'package.json'),
+      packageDir: shipped, scope: 'profile', version: '4.0.0', declarer: f.installAnchor,
     })
     expect(resolution.entries.find(entry => entry.name === 'profile-bundle')).toBeUndefined()
+    // The route resolves from the declarer, so Node must find the bundle from there.
+    expect(createRequire(f.installAnchor)('shipped-bundle')).toEqual({ marker: 4 })
   })
 
   it('keeps each earlier root complete before considering a later root', async () => {
