@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { authenticateWebHost, forwardWebRequest, serveWebDocument } from '../src/web-document.ts'
+import { authenticateWebHost, forwardWebRequest, isPackagedWebPath, serveWebDocument } from '../src/web-document.ts'
 
 const roots: string[] = []
 afterEach(async () => {
@@ -85,4 +85,11 @@ it('refuses another page origin without forwarding its request', async () => {
   const response = await forwardWebRequest(new Request('dsh-app://app/api/read', { headers: { origin: 'https://other.example' } }), 'http://127.0.0.1:1234/', 'session=owned')
   expect(response.status).toBe(403)
   expect(fetch).not.toHaveBeenCalled()
+})
+
+it('serves the boot page marks and favicons locally so they load before the Host starts', () => {
+  for (const path of ['/', '/index.html', '/assets/index-abc.js', '/favicon.svg', '/favicon-dark.svg', '/boot-mark.svg', '/boot-mark-dark.svg', '/manifest.webmanifest']) {
+    expect(isPackagedWebPath(path)).toBe(true)
+  }
+  for (const path of ['/api/rpc', '/plugins/x.js', '/boot-mark.svg/x', '/preview.html']) expect(isPackagedWebPath(path)).toBe(false)
 })

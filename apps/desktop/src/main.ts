@@ -680,8 +680,7 @@ async function main(): Promise<void> {
     // Shell-owned documents live in the application bundle and never pass through the Host.
     if (url.hostname === 'shell') return serveWebDocument(request, join(app.getAppPath(), 'renderer'))
     if (url.hostname === 'app') {
-      if (url.pathname === '/' || url.pathname === '/index.html' || url.pathname.startsWith('/assets/')
-        || ['/favicon.svg', '/manifest.webmanifest'].includes(url.pathname)) {
+      if (isPackagedWebPath(url.pathname)) {
         return serveWebDocument(request, join(resources.dsh, 'node_modules', '@deepseek-ai', 'dsh-web-frontend', 'dist'))
       }
       if (backend.host === undefined || hostUrl === undefined || hostCookie === undefined) {
